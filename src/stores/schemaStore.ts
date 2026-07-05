@@ -1,0 +1,699 @@
+import { create } from 'zustand';
+import { SchemaNode, SchemaType } from '@/types/schema';
+import { useEditorStore } from './editorStore';
+import { findNodeById } from '@/utils/treeUtils';
+
+interface SchemaStore {
+  rootSchema: SchemaNode | null;
+  definitions: Record<string, SchemaNode>;
+
+  setRootSchema: (schema: SchemaNode) => void;
+  updateNode: (nodeId: string, updates: Partial<SchemaNode>) => void;
+  addNode: (parentId: string | null, node: SchemaNode) => void;
+  removeNode: (nodeId: string) => void;
+  moveNode: (nodeId: string, newParentId: string, newIndex: number) => void;
+  renamePropertyKey: (parentId: string, oldKey: string, newKey: string) => void;
+
+  addDefinition: (name: string, schema: SchemaNode) => void;
+  updateDefinition: (name: string, schema: SchemaNode) => void;
+  removeDefinition: (name: string) => void;
+  createRef: (definitionName: string) => string;
+
+  createNode: (type: SchemaType, name?: string) => SchemaNode;
+  convertContainerNode: (containerId: string, newKind: string) => void;
+}
+
+let nodeIdCounter = 0;
+
+export const createNodeId = (): string => {
+  return `node_${Date.now()}_${nodeIdCounter++}`;
+};
+
+export const useSchemaStore = create<SchemaStore>((set, get) => ({
+  rootSchema: null,
+  definitions: {},
+
+  setRootSchema: (schema) => set({ rootSchema: schema }),
+
+  updateNode: (nodeId, updates) => {
+    const { rootSchema } = get();
+    if (!rootSchema) return;
+
+    const updateNodeRecursive = (node: SchemaNode): SchemaNode => {
+      if (node.id === nodeId) {
+        const updated = { ...node, ...updates };
+        // 类型变更为 object 时确保 properties 字段存在
+        if (updates.type === 'object' && node.type !== 'object') {
+          if (!updated.properties) updated.properties = {};
+        }
+        return updated;
+      }
+
+      let result: SchemaNode = node;
+
+      if (node.properties) {
+        const newProperties: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(node.properties)) {
+          newProperties[key] = updateNodeRecursive(child);
+        }
+        result = { ...result, properties: newProperties };
+      }
+
+      if (node.patternProperties) {
+        const newPatternProperties: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(node.patternProperties)) {
+          newPatternProperties[key] = updateNodeRecursive(child);
+        }
+        result = { ...result, patternProperties: newPatternProperties };
+      }
+
+      if (node.additionalProperties && typeof node.additionalProperties === 'object') {
+        result = { ...result, additionalProperties: updateNodeRecursive(node.additionalProperties) };
+      }
+
+      if (node.propertyNames) {
+        result = { ...result, propertyNames: updateNodeRecursive(node.propertyNames) };
+      }
+
+      if (node.dependentSchemas) {
+        const newDependentSchemas: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(node.dependentSchemas)) {
+          newDependentSchemas[key] = updateNodeRecursive(child);
+        }
+        result = { ...result, dependentSchemas: newDependentSchemas };
+      }
+
+      if (node._containers) {
+        result = {
+          ...result,
+          _containers: node._containers.map((container) =>
+            updateNodeRecursive(container)
+          ),
+        };
+      }
+
+      if (node.items) {
+        if (Array.isArray(node.items)) {
+          result = {
+            ...result,
+            items: node.items.map((item) => updateNodeRecursive(item)),
+          };
+        } else {
+          result = { ...result, items: updateNodeRecursive(node.items) };
+        }
+      }
+
+      return result;
+    };
+
+    set({ rootSchema: updateNodeRecursive(rootSchema) });
+  },
+
+  addNode: (parentId, node) => {
+    const { rootSchema } = get();
+
+    if (!parentId) {
+      set({ rootSchema: node });
+      useEditorStore.getState().selectNode(node.id);
+      return;
+    }
+
+    if (!rootSchema) return;
+
+    // 检查 parentId 是否是容器节点，如果是则重定向到实际的 object 节点
+    let actualParentId = parentId;
+    let containerKind: string | undefined;
+    const parentNode = findNodeById(rootSchema, parentId);
+    if (parentNode && parentNode._nodeKind && parentNode._nodeKind !== 'normal') {
+      containerKind = parentNode._nodeKind;
+      actualParentId = parentNode._parentId!;
+    }
+
+    const addNodeRecursive = (current: SchemaNode): SchemaNode => {
+      if (current.id === actualParentId) {
+        if (containerKind === 'properties') {
+          const nodeName = node.title || `property_${Date.now()}`;
+          const isPattern = nodeName.includes('*') || nodeName.startsWith('^') || nodeName.includes('[');
+
+          if (isPattern) {
+            return {
+              ...current,
+              patternProperties: {
+                ...current.patternProperties,
+                [nodeName]: { ...node, _parentId: current.id },
+              },
+            };
+          } else {
+            return {
+              ...current,
+              properties: {
+                ...current.properties,
+                [nodeName]: { ...node, _parentId: current.id },
+              },
+            };
+          }
+        }
+
+        if (containerKind === 'patternProperties') {
+          const nodeName = node.title || `pattern_${Date.now()}`;
+          return {
+            ...current,
+            patternProperties: {
+              ...current.patternProperties,
+              [nodeName]: { ...node, _parentId: current.id },
+            },
+          };
+        }
+
+        if (containerKind === 'additionalProperties') {
+          return {
+            ...current,
+            additionalProperties: { ...node, _parentId: current.id },
+          };
+        }
+
+        if (containerKind === 'dependentSchemas') {
+          const nodeName = node.title || `dependency_${Date.now()}`;
+          return {
+            ...current,
+            dependentSchemas: {
+              ...current.dependentSchemas,
+              [nodeName]: { ...node, _parentId: current.id },
+            },
+          };
+        }
+
+        if (containerKind === 'propertyNames') {
+          return {
+            ...current,
+            propertyNames: { ...node, _parentId: current.id },
+          };
+        }
+
+        // 直接向 object 节点添加子节点（原有的逻辑）
+        if (current.type === 'object') {
+          const nodeName = node.title || `property_${Date.now()}`;
+          const isPattern = nodeName.includes('*') || nodeName.startsWith('^') || nodeName.includes('[');
+
+          if (isPattern) {
+            return {
+              ...current,
+              patternProperties: {
+                ...current.patternProperties,
+                [nodeName]: { ...node, _parentId: current.id },
+              },
+            };
+          } else {
+            return {
+              ...current,
+              properties: {
+                ...current.properties,
+                [nodeName]: { ...node, _parentId: current.id },
+              },
+            };
+          }
+        } else if (current.type === 'array') {
+          return {
+            ...current,
+            items: { ...node, _parentId: current.id },
+          };
+        }
+      }
+
+      let result: SchemaNode = current;
+
+      if (current.properties) {
+        const newProperties: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(current.properties)) {
+          newProperties[key] = addNodeRecursive(child);
+        }
+        result = { ...result, properties: newProperties };
+      }
+
+      if (current.patternProperties) {
+        const newPatternProperties: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(current.patternProperties)) {
+          newPatternProperties[key] = addNodeRecursive(child);
+        }
+        result = { ...result, patternProperties: newPatternProperties };
+      }
+
+      if (current.additionalProperties && typeof current.additionalProperties === 'object') {
+        result = { ...result, additionalProperties: addNodeRecursive(current.additionalProperties) };
+      }
+
+      if (current.propertyNames) {
+        result = { ...result, propertyNames: addNodeRecursive(current.propertyNames) };
+      }
+
+      if (current.dependentSchemas) {
+        const newDependentSchemas: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(current.dependentSchemas)) {
+          newDependentSchemas[key] = addNodeRecursive(child);
+        }
+        result = { ...result, dependentSchemas: newDependentSchemas };
+      }
+
+      if (current._containers) {
+        result = {
+          ...result,
+          _containers: current._containers.map((container) => addNodeRecursive(container)),
+        };
+      }
+
+      if (current.items) {
+        if (Array.isArray(current.items)) {
+          result = {
+            ...result,
+            items: current.items.map((item) => addNodeRecursive(item)),
+          };
+        } else {
+          result = { ...result, items: addNodeRecursive(current.items) };
+        }
+      }
+
+      return result;
+    };
+
+    set({ rootSchema: addNodeRecursive(rootSchema) });
+    const editorStore = useEditorStore.getState();
+    if (!editorStore.expandedNodes.has(actualParentId)) {
+      editorStore.toggleExpand(actualParentId);
+    }
+    setTimeout(() => {
+      useEditorStore.getState().selectNode(node.id);
+    }, 0);
+  },
+
+  removeNode: (nodeId) => {
+    const { rootSchema } = get();
+    if (!rootSchema || rootSchema.id === nodeId) {
+      set({ rootSchema: null });
+      useEditorStore.getState().selectNode(null);
+      return;
+    }
+
+    const findParentId = (node: SchemaNode, targetId: string): string | null => {
+      if (node.properties) {
+        for (const child of Object.values(node.properties)) {
+          if (child.id === targetId) return node.id;
+          const found = findParentId(child, targetId);
+          if (found) return found;
+        }
+      }
+      if (node.patternProperties) {
+        for (const child of Object.values(node.patternProperties)) {
+          if (child.id === targetId) return node.id;
+          const found = findParentId(child, targetId);
+          if (found) return found;
+        }
+      }
+      if (node.additionalProperties && typeof node.additionalProperties === 'object') {
+        if (node.additionalProperties.id === targetId) return node.id;
+        const found = findParentId(node.additionalProperties, targetId);
+        if (found) return found;
+      }
+      if (node.propertyNames) {
+        if (node.propertyNames.id === targetId) return node.id;
+        const found = findParentId(node.propertyNames, targetId);
+        if (found) return found;
+      }
+      if (node.dependentSchemas) {
+        for (const child of Object.values(node.dependentSchemas)) {
+          if (child.id === targetId) return node.id;
+          const found = findParentId(child, targetId);
+          if (found) return found;
+        }
+      }
+      if (node.items) {
+        if (Array.isArray(node.items)) {
+          for (const item of node.items) {
+            if (item.id === targetId) return node.id;
+            const found = findParentId(item, targetId);
+            if (found) return found;
+          }
+        } else if (node.items.id === targetId) {
+          return node.id;
+        } else {
+          const found = findParentId(node.items, targetId);
+          if (found) return found;
+        }
+      }
+      if (node._containers) {
+        for (const container of node._containers) {
+          if (container.id === targetId) return node.id;
+          const found = findParentId(container, targetId);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const parentId = findParentId(rootSchema, nodeId);
+
+    const removeNodeRecursive = (node: SchemaNode): SchemaNode => {
+      let result: SchemaNode = node;
+
+      if (node.properties) {
+        const newProperties: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(node.properties)) {
+          if (child.id !== nodeId) {
+            newProperties[key] = removeNodeRecursive(child);
+          }
+        }
+        result = { ...result, properties: newProperties };
+      }
+
+      if (node.patternProperties) {
+        const newPatternProperties: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(node.patternProperties)) {
+          if (child.id !== nodeId) {
+            newPatternProperties[key] = removeNodeRecursive(child);
+          }
+        }
+        result = { ...result, patternProperties: newPatternProperties };
+      }
+
+      if (node.additionalProperties && typeof node.additionalProperties === 'object') {
+        if (node.additionalProperties.id === nodeId) {
+          result = { ...result, additionalProperties: false };
+        } else {
+          result = { ...result, additionalProperties: removeNodeRecursive(node.additionalProperties) };
+        }
+      }
+
+      if (node.propertyNames) {
+        if (node.propertyNames.id === nodeId) {
+          result = { ...result, propertyNames: undefined };
+        } else {
+          result = { ...result, propertyNames: removeNodeRecursive(node.propertyNames) };
+        }
+      }
+
+      if (node.dependentSchemas) {
+        const newDependentSchemas: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(node.dependentSchemas)) {
+          if (child.id !== nodeId) {
+            newDependentSchemas[key] = removeNodeRecursive(child);
+          }
+        }
+        result = { ...result, dependentSchemas: newDependentSchemas };
+      }
+
+      if (node._containers) {
+        result = {
+          ...result,
+          _containers: node._containers
+            .filter(c => c.id !== nodeId)
+            .map(c => removeNodeRecursive(c)),
+        };
+      }
+
+      if (node.items) {
+        if (Array.isArray(node.items)) {
+          result = {
+            ...result,
+            items: node.items
+              .filter((item) => item.id !== nodeId)
+              .map((item) => removeNodeRecursive(item)),
+          };
+        } else if (node.items.id === nodeId) {
+          result = { ...result, items: undefined };
+        } else {
+          result = { ...result, items: removeNodeRecursive(node.items) };
+        }
+      }
+
+      return result;
+    };
+
+    set({ rootSchema: removeNodeRecursive(rootSchema) });
+    if (parentId) {
+      useEditorStore.getState().selectNode(parentId);
+    }
+  },
+
+  moveNode: (nodeId, newParentId, newIndex) => {
+    console.log('Move node', nodeId, 'to', newParentId, 'at index', newIndex);
+  },
+
+  renamePropertyKey: (parentId, oldKey, newKey) => {
+    const { rootSchema } = get();
+    if (!rootSchema || !newKey || oldKey === newKey) return;
+
+    const renameKeyRecursive = (node: SchemaNode): SchemaNode => {
+      if (node.id === parentId) {
+        // 处理 properties
+        if (node.properties && oldKey in node.properties) {
+          const newProperties = { ...node.properties };
+          const childNode = newProperties[oldKey];
+          delete newProperties[oldKey];
+          newProperties[newKey] = childNode;
+          return { ...node, properties: newProperties };
+        }
+        // 处理 patternProperties
+        if (node.patternProperties && oldKey in node.patternProperties) {
+          const newPatternProperties = { ...node.patternProperties };
+          const childNode = newPatternProperties[oldKey];
+          delete newPatternProperties[oldKey];
+          newPatternProperties[newKey] = childNode;
+          return { ...node, patternProperties: newPatternProperties };
+        }
+        // 处理 dependentSchemas
+        if (node.dependentSchemas && oldKey in node.dependentSchemas) {
+          const newDependentSchemas = { ...node.dependentSchemas };
+          const childNode = newDependentSchemas[oldKey];
+          delete newDependentSchemas[oldKey];
+          newDependentSchemas[newKey] = childNode;
+          return { ...node, dependentSchemas: newDependentSchemas };
+        }
+      }
+
+      // 递归处理子节点
+      if (node.properties) {
+        const newProperties: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(node.properties)) {
+          newProperties[key] = renameKeyRecursive(child);
+        }
+        node = { ...node, properties: newProperties };
+      }
+
+      if (node.patternProperties) {
+        const newPatternProperties: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(node.patternProperties)) {
+          newPatternProperties[key] = renameKeyRecursive(child);
+        }
+        node = { ...node, patternProperties: newPatternProperties };
+      }
+
+      if (node.additionalProperties && typeof node.additionalProperties === 'object') {
+        node = { ...node, additionalProperties: renameKeyRecursive(node.additionalProperties) };
+      }
+
+      if (node.propertyNames) {
+        node = { ...node, propertyNames: renameKeyRecursive(node.propertyNames) };
+      }
+
+      if (node.dependentSchemas) {
+        const newDependentSchemas: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(node.dependentSchemas)) {
+          newDependentSchemas[key] = renameKeyRecursive(child);
+        }
+        node = { ...node, dependentSchemas: newDependentSchemas };
+      }
+
+      if (node._containers) {
+        node = {
+          ...node,
+          _containers: node._containers.map((container) =>
+            renameKeyRecursive(container)
+          ),
+        };
+      }
+
+      if (node.items) {
+        if (Array.isArray(node.items)) {
+          node = {
+            ...node,
+            items: node.items.map((item) => renameKeyRecursive(item)),
+          };
+        } else {
+          node = { ...node, items: renameKeyRecursive(node.items) };
+        }
+      }
+
+      return node;
+    };
+
+    set({ rootSchema: renameKeyRecursive(rootSchema) });
+  },
+
+  addDefinition: (name, schema) => {
+    const { definitions } = get();
+    set({ definitions: { ...definitions, [name]: schema } });
+  },
+
+  updateDefinition: (name, schema) => {
+    const { definitions } = get();
+    set({ definitions: { ...definitions, [name]: schema } });
+  },
+
+  removeDefinition: (name) => {
+    const { definitions } = get();
+    const newDefinitions = { ...definitions };
+    delete newDefinitions[name];
+    set({ definitions: newDefinitions });
+  },
+
+  createRef: (definitionName) => {
+    return `#/definitions/${definitionName}`;
+  },
+
+  createNode: (type, name) => {
+    const node: SchemaNode = {
+      id: createNodeId(),
+      type,
+      title: name,
+      _order: 0,
+    };
+
+    if (type === 'object') {
+      node.properties = {};
+    } else if (type === 'array') {
+      node.items = {
+        id: createNodeId(),
+        type: 'string',
+        title: 'items',
+        _order: 0,
+        _parentId: node.id,
+      };
+    }
+
+    return node;
+  },
+
+  convertContainerNode: (containerId, newKind) => {
+    const { rootSchema } = get();
+    if (!rootSchema) return;
+
+    const container = findNodeById(rootSchema, containerId);
+    if (!container || !container._nodeKind || container._nodeKind === newKind) return;
+
+    const oldKind = container._nodeKind;
+    const parentId = container._parentId;
+    if (!parentId) return;
+
+    const parentNode = findNodeById(rootSchema, parentId);
+    if (!parentNode) return;
+
+    // 检查目标类型是否已被其他容器占用
+    const existingKinds = new Set(parentNode._containers?.map(c => c._nodeKind) || []);
+    if (existingKinds.has(newKind as any)) return;
+
+    const kindLabels: Record<string, string> = {
+      properties: 'properties',
+      patternProperties: 'patternProperties',
+      additionalProperties: 'additionalProperties',
+      propertyNames: 'propertyNames',
+      dependentSchemas: 'dependentSchemas',
+    };
+
+    const convertRecursive = (node: SchemaNode): SchemaNode => {
+      let result = { ...node };
+
+      // 如果当前节点是父节点，做数据迁移
+      if (node.id === parentId) {
+        // 移出旧数据
+        if (oldKind === 'properties') {
+          result.properties = {};
+        } else if (oldKind === 'patternProperties') {
+          result.patternProperties = {};
+        } else if (oldKind === 'additionalProperties') {
+          result.additionalProperties = false;
+        } else if (oldKind === 'propertyNames') {
+          result.propertyNames = undefined;
+        } else if (oldKind === 'dependentSchemas') {
+          result.dependentSchemas = undefined;
+        }
+
+        // 移入新数据（仅 properties ↔ patternProperties 之间可迁移数据）
+        if (newKind === 'properties' && oldKind === 'patternProperties' && node.patternProperties) {
+          result.properties = { ...node.patternProperties };
+        } else if (newKind === 'patternProperties' && oldKind === 'properties' && node.properties) {
+          result.patternProperties = { ...node.properties };
+        } else if (newKind === 'additionalProperties') {
+          result.additionalProperties = false;
+        } else if (newKind === 'propertyNames') {
+          result.propertyNames = { id: createNodeId(), type: 'string', _order: 0, _parentId: node.id };
+        } else if (newKind === 'dependentSchemas') {
+          result.dependentSchemas = {};
+        } else if (newKind === 'properties' && !result.properties) {
+          result.properties = {};
+        } else if (newKind === 'patternProperties' && !result.patternProperties) {
+          result.patternProperties = {};
+        }
+      }
+
+      // 递归处理子节点
+      if (node.properties) {
+        const newProperties: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(node.properties)) {
+          newProperties[key] = convertRecursive(child);
+        }
+        result = { ...result, properties: newProperties };
+      }
+
+      if (node.patternProperties) {
+        const newPatternProperties: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(node.patternProperties)) {
+          newPatternProperties[key] = convertRecursive(child);
+        }
+        result = { ...result, patternProperties: newPatternProperties };
+      }
+
+      if (node.additionalProperties && typeof node.additionalProperties === 'object') {
+        result = { ...result, additionalProperties: convertRecursive(node.additionalProperties) };
+      }
+
+      if (node.propertyNames) {
+        result = { ...result, propertyNames: convertRecursive(node.propertyNames) };
+      }
+
+      if (node.dependentSchemas) {
+        const newDependentSchemas: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(node.dependentSchemas)) {
+          newDependentSchemas[key] = convertRecursive(child);
+        }
+        result = { ...result, dependentSchemas: newDependentSchemas };
+      }
+
+      if (node._containers) {
+        result = {
+          ...result,
+          _containers: node._containers.map(c => convertRecursive(c)),
+        };
+      }
+
+      if (node.items) {
+        if (Array.isArray(node.items)) {
+          result = { ...result, items: node.items.map(item => convertRecursive(item)) };
+        } else {
+          result = { ...result, items: convertRecursive(node.items) };
+        }
+      }
+
+      // 如果当前节点是容器本身，更新类型
+      if (node.id === containerId) {
+        result = {
+          ...result,
+          _nodeKind: newKind as any,
+          title: kindLabels[newKind] || newKind,
+        };
+      }
+
+      return result;
+    };
+
+    set({ rootSchema: convertRecursive(rootSchema) });
+  },
+}));
