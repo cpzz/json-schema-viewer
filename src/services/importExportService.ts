@@ -6,9 +6,7 @@ import {
   compressJsonSchema,
 } from '@/utils/schemaGenerator';
 
-export async function importSchema(
-  filePath: string
-): Promise<{ schema: SchemaNode; filePath: string } | null> {
+export async function importSchema(): Promise<{ schema: SchemaNode; filePath: string } | null> {
   if (window.electronAPI) {
     const result = await window.electronAPI.file.open();
     if (result) {

@@ -21,11 +21,16 @@ export interface SchemaNode {
   items?: SchemaNode | SchemaNode[];
   required?: string[];
   enum?: any[];
+  enumRaw?: string;
+  const?: any;
   default?: any;
   $ref?: string;
   definitions?: Record<string, SchemaNode>;
   minimum?: number;
   maximum?: number;
+  exclusiveMinimum?: number;
+  exclusiveMaximum?: number;
+  multipleOf?: number;
   minLength?: number;
   maxLength?: number;
   pattern?: string;

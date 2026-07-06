@@ -1,13 +1,67 @@
 import { useEffect, useState } from 'react';
-import { SchemaNode } from '@/types/schema';
+import {
+  ChevronDown,
+  Type,
+  Box,
+  List,
+  Hash,
+  ToggleLeft,
+  CircleOff,
+  FolderOpen,
+  Ban,
+  Key,
+  GitBranch,
+} from 'lucide-react';
+import { SchemaNode, SchemaType } from '@/types/schema';
 import { useSchemaStore } from '@/stores/schemaStore';
 import { useEditorStore } from '@/stores/editorStore';
 import { findNodeById, findParentNode } from '@/utils/treeUtils';
+import { ClearableInput } from './ClearableInput';
+import { useI18n } from '@/stores/languageStore';
+
+function getTypeIcon(type: SchemaType) {
+  switch (type) {
+    case 'string':
+      return <Type size={14} className="text-green-600" />;
+    case 'number':
+    case 'integer':
+      return <Hash size={14} className="text-blue-600" />;
+    case 'boolean':
+      return <ToggleLeft size={14} className="text-purple-600" />;
+    case 'object':
+      return <Box size={14} className="text-orange-600" />;
+    case 'array':
+      return <List size={14} className="text-pink-600" />;
+    case 'null':
+      return <CircleOff size={14} className="text-gray-600" />;
+    default:
+      return <Type size={14} className="text-gray-600" />;
+  }
+}
+
+function getContainerIcon(kind?: string) {
+  switch (kind) {
+    case 'properties':
+      return <Box size={14} className="text-blue-500" />;
+    case 'patternProperties':
+      return <List size={14} className="text-purple-500" />;
+    case 'additionalProperties':
+      return <Ban size={14} className="text-red-400" />;
+    case 'propertyNames':
+      return <Key size={14} className="text-amber-500" />;
+    case 'dependentSchemas':
+      return <GitBranch size={14} className="text-teal-500" />;
+    default:
+      return <FolderOpen size={14} className="text-gray-500" />;
+  }
+}
 
 export function PropertyPanel() {
   const { rootSchema, updateNode, renamePropertyKey } = useSchemaStore();
   const { selectedNodeId } = useEditorStore();
+  const { t } = useI18n();
   const [propertyKey, setPropertyKey] = useState('');
+  const [isAnnotationExpanded, setIsAnnotationExpanded] = useState(false);
 
   const selectedNode = rootSchema && selectedNodeId
     ? findNodeById(rootSchema, selectedNodeId)
@@ -44,8 +98,8 @@ export function PropertyPanel() {
 
   if (!selectedNode) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-        请选择一个节点
+      <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm">
+        {t('selectNode')}
       </div>
     );
   }
@@ -53,31 +107,23 @@ export function PropertyPanel() {
   // 容器节点显示编辑面板
   if (selectedNode._nodeKind && selectedNode._nodeKind !== 'normal') {
     const containerLabels: Record<string, string> = {
-      properties: '普通属性定义',
-      patternProperties: '模式属性定义',
-      additionalProperties: '额外属性控制',
-      propertyNames: '属性名约束',
-      dependentSchemas: '条件依赖',
+      properties: t('properties'),
+      patternProperties: t('patternProperties'),
+      additionalProperties: t('additionalProperties'),
+      propertyNames: t('propertyNames'),
+      dependentSchemas: t('dependentSchemas'),
     };
 
+    const containerLabel = containerLabels[selectedNode._nodeKind] || selectedNode._nodeKind;
+
     return (
-      <div className="flex-1 overflow-auto p-4 bg-white">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">应用器节点</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              类型
-            </label>
-            <input
-              type="text"
-              value={containerLabels[selectedNode._nodeKind] || selectedNode._nodeKind}
-              disabled
-              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded bg-gray-50 text-gray-500"
-            />
-          </div>
-          <div className="text-xs text-gray-400">
-            在此节点上右键可添加子项
-          </div>
+      <div className="flex-1 overflow-auto p-4 bg-white dark:bg-gray-900">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+          {t('propertyType')}: {getContainerIcon(selectedNode._nodeKind)}
+          {containerLabel}
+        </h3>
+        <div className="text-xs text-gray-400 dark:text-gray-500">
+          {t('addChildItem')}
         </div>
       </div>
     );
@@ -90,256 +136,308 @@ export function PropertyPanel() {
   };
 
   const handlePropertyKeyChange = (newKey: string) => {
-    setPropertyKey(newKey);
-    if (parentNode && propertyKey && newKey && newKey !== propertyKey) {
+    if (parentNode && propertyKey !== newKey) {
       renamePropertyKey(parentNode.id, propertyKey, newKey);
     }
+    setPropertyKey(newKey);
   };
 
   return (
-    <div className="flex-1 overflow-auto p-4 bg-white">
-      <h3 className="text-sm font-semibold text-gray-900 mb-4">属性编辑</h3>
+    <div className="flex-1 overflow-auto p-4 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+        {t('propertyType')}: {getTypeIcon(selectedNode.type)}
+        {selectedNode.type}
+      </h3>
 
       <div className="space-y-4">
         {parentNode && !isAdditionalPropertyChild && (
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              属性名 (Property Key)
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('propertyKey')}
             </label>
-            <input
-              type="text"
+            <ClearableInput
               value={propertyKey}
-              onChange={(e) => handlePropertyKeyChange(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="属性名"
+              onChange={(e) => handlePropertyKeyChange(e)}
+              placeholder={t('placeholderPropertyName')}
             />
           </div>
         )}
 
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">类型</label>
-          <input
-            type="text"
-            value={selectedNode.type}
-            disabled
-            className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded bg-gray-50 text-gray-500"
-          />
-        </div>
-
         {isObjectNode ? (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">标题</label>
-              <input
-                type="text"
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('title')}</label>
+              <ClearableInput
                 value={selectedNode.title || ''}
-                onChange={(e) => handleUpdate({ title: e.target.value })}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="标题"
+                onChange={(e) => handleUpdate({ title: e })}
+                placeholder={t('placeholderTitle')}
               />
             </div>
-            <div className="border-t border-gray-200 pt-3">
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">描述</label>
-                  <textarea
-                    value={selectedNode.description || ''}
-                    onChange={(e) => handleUpdate({ description: e.target.value })}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    rows={3}
-                    placeholder="属性描述"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">注释 (${'$comment'})</label>
-                  <input
-                    type="text"
-                    value={selectedNode.$comment || ''}
-                    onChange={(e) => handleUpdate({ $comment: e.target.value || undefined })}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="注释文字"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">示例</label>
-                  <input
-                    type="text"
-                    value={selectedNode.examples ? selectedNode.examples.join(', ') : ''}
-                    onChange={(e) => {
-                      const values = e.target.value
-                        .split(',')
-                        .map((v) => v.trim())
-                        .filter((v) => v);
-                      handleUpdate({ examples: values.length > 0 ? values : undefined });
-                    }}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="逗号分隔，例如: value1, value2"
-                  />
-                </div>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={selectedNode.readOnly === true}
-                      onChange={(e) => handleUpdate({ readOnly: e.target.checked || undefined })}
-                      className="rounded border-gray-300"
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+              {/* Collapsible Annotation Section */}
+              <button
+                onClick={() => setIsAnnotationExpanded(!isAnnotationExpanded)}
+                className="flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 hover:text-gray-700 dark:hover:text-gray-300 transition"
+              >
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform ${isAnnotationExpanded ? 'rotate-0' : '-rotate-90'}`}
+                />
+                {t('annotation')}
+              </button>
+              {isAnnotationExpanded && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('description')}</label>
+                    <ClearableInput
+                      value={selectedNode.description || ''}
+                      onChange={(e) => handleUpdate({ description: e })}
+                      placeholder={t('placeholderDescription')}
+                      isTextarea={true}
+                      rows={3}
                     />
-                    <span className="text-xs text-gray-700">readOnly</span>
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={selectedNode.writeOnly === true}
-                      onChange={(e) => handleUpdate({ writeOnly: e.target.checked || undefined })}
-                      className="rounded border-gray-300"
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('comment')} (${'$comment'})</label>
+                    <ClearableInput
+                      value={selectedNode.$comment || ''}
+                      onChange={(e) => handleUpdate({ $comment: e || undefined })}
+                      placeholder={t('placeholderComment')}
                     />
-                    <span className="text-xs text-gray-700">writeOnly</span>
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={selectedNode.deprecated === true}
-                      onChange={(e) => handleUpdate({ deprecated: e.target.checked || undefined })}
-                      className="rounded border-gray-300"
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('examples')}</label>
+                    <ClearableInput
+                      value={selectedNode.examples ? selectedNode.examples.join(', ') : ''}
+                      onChange={(e) => {
+                        const values = e
+                          .split(',')
+                          .map((v) => v.trim())
+                          .filter((v) => v);
+                        handleUpdate({ examples: values.length > 0 ? values : undefined });
+                      }}
+                      placeholder={t('placeholderEnum')}
                     />
-                    <span className="text-xs text-gray-700">deprecated</span>
-                  </label>
+                  </div>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedNode.readOnly === true}
+                        onChange={(e) => handleUpdate({ readOnly: e.target.checked || undefined })}
+                        className="rounded border-gray-300 dark:border-gray-600"
+                      />
+                      <span className="text-xs text-gray-700 dark:text-gray-300">readOnly</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedNode.writeOnly === true}
+                        onChange={(e) => handleUpdate({ writeOnly: e.target.checked || undefined })}
+                        className="rounded border-gray-300 dark:border-gray-600"
+                      />
+                      <span className="text-xs text-gray-700 dark:text-gray-300">writeOnly</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedNode.deprecated === true}
+                        onChange={(e) => handleUpdate({ deprecated: e.target.checked || undefined })}
+                        className="rounded border-gray-300 dark:border-gray-600"
+                      />
+                      <span className="text-xs text-gray-700 dark:text-gray-300">deprecated</span>
+                    </label>
+                  </div>
                 </div>
+              )}
+              <div className="border-t border-gray-200 dark:border-gray-700 mt-3 pt-3" />
+            </div>
+
+            {selectedNode.type !== 'boolean' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('enum')}</label>
+                <ClearableInput
+                  value={selectedNode.enumRaw || ''}
+                  onChange={(e) => handleUpdate({ enumRaw: e })}
+                  placeholder={t('placeholderEnum')}
+                />
               </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('default')}</label>
+              <ClearableInput
+                value={selectedNode.default !== undefined ? String(selectedNode.default) : ''}
+                onChange={(e) => {
+                  const inputValue = e;
+                  if (!inputValue) {
+                    handleUpdate({ default: undefined });
+                    return;
+                  }
+                  let defaultValue: any = inputValue;
+                  if (selectedNode.type === 'number' || selectedNode.type === 'integer') {
+                    defaultValue = selectedNode.type === 'integer' ? parseInt(inputValue) : parseFloat(inputValue);
+                    if (isNaN(defaultValue)) {
+                      return;
+                    }
+                  } else if (selectedNode.type === 'boolean') {
+                    defaultValue = inputValue.toLowerCase() === 'true' || inputValue === '1';
+                  }
+                  handleUpdate({ default: defaultValue });
+                }}
+                placeholder={t('placeholderDefault')}
+              />
             </div>
           </>
         ) : (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">标题</label>
-              <input
-                type="text"
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('title')}</label>
+              <ClearableInput
                 value={selectedNode.title || ''}
-                onChange={(e) => handleUpdate({ title: e.target.value })}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="标题"
+                onChange={(e) => handleUpdate({ title: e })}
+                placeholder={t('placeholderTitle')}
               />
             </div>
 
             {/* Annotation 字段 */}
-            <div className="border-t border-gray-200 pt-3">
-              <h4 className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">注释 (Annotation)</h4>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">描述</label>
-                  <textarea
-                    value={selectedNode.description || ''}
-                    onChange={(e) => handleUpdate({ description: e.target.value })}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    rows={3}
-                    placeholder="属性描述"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">注释 (${'$comment'})</label>
-                  <input
-                    type="text"
-                    value={selectedNode.$comment || ''}
-                    onChange={(e) => handleUpdate({ $comment: e.target.value || undefined })}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="注释文字"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">示例</label>
-                  <input
-                    type="text"
-                    value={selectedNode.examples ? selectedNode.examples.join(', ') : ''}
-                    onChange={(e) => {
-                      const values = e.target.value
-                        .split(',')
-                        .map((v) => v.trim())
-                        .filter((v) => v);
-                      handleUpdate({ examples: values.length > 0 ? values : undefined });
-                    }}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="逗号分隔，例如: value1, value2"
-                  />
-                </div>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={selectedNode.readOnly === true}
-                      onChange={(e) => handleUpdate({ readOnly: e.target.checked || undefined })}
-                      className="rounded border-gray-300"
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+              <button
+                onClick={() => setIsAnnotationExpanded(!isAnnotationExpanded)}
+                className="flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 hover:text-gray-700 dark:hover:text-gray-300 transition"
+              >
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform ${isAnnotationExpanded ? 'rotate-0' : '-rotate-90'}`}
+                />
+                {t('annotation')}
+              </button>
+              {isAnnotationExpanded && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('description')}</label>
+                    <ClearableInput
+                      value={selectedNode.description || ''}
+                      onChange={(e) => handleUpdate({ description: e })}
+                      placeholder={t('placeholderDescription')}
+                      isTextarea={true}
+                      rows={3}
                     />
-                    <span className="text-xs text-gray-700">readOnly</span>
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={selectedNode.writeOnly === true}
-                      onChange={(e) => handleUpdate({ writeOnly: e.target.checked || undefined })}
-                      className="rounded border-gray-300"
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('comment')} (${'$comment'})</label>
+                    <ClearableInput
+                      value={selectedNode.$comment || ''}
+                      onChange={(e) => handleUpdate({ $comment: e || undefined })}
+                      placeholder={t('placeholderComment')}
                     />
-                    <span className="text-xs text-gray-700">writeOnly</span>
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={selectedNode.deprecated === true}
-                      onChange={(e) => handleUpdate({ deprecated: e.target.checked || undefined })}
-                      className="rounded border-gray-300"
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('examples')}</label>
+                    <ClearableInput
+                      value={selectedNode.examples ? selectedNode.examples.join(', ') : ''}
+                      onChange={(e) => {
+                        const values = e
+                          .split(',')
+                          .map((v) => v.trim())
+                          .filter((v) => v);
+                        handleUpdate({ examples: values.length > 0 ? values : undefined });
+                      }}
+                      placeholder={t('placeholderEnum')}
                     />
-                    <span className="text-xs text-gray-700">deprecated</span>
-                  </label>
+                  </div>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedNode.readOnly === true}
+                        onChange={(e) => handleUpdate({ readOnly: e.target.checked || undefined })}
+                        className="rounded border-gray-300 dark:border-gray-600"
+                      />
+                      <span className="text-xs text-gray-700 dark:text-gray-300">readOnly</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedNode.writeOnly === true}
+                        onChange={(e) => handleUpdate({ writeOnly: e.target.checked || undefined })}
+                        className="rounded border-gray-300 dark:border-gray-600"
+                      />
+                      <span className="text-xs text-gray-700 dark:text-gray-300">writeOnly</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedNode.deprecated === true}
+                        onChange={(e) => handleUpdate({ deprecated: e.target.checked || undefined })}
+                        className="rounded border-gray-300 dark:border-gray-600"
+                      />
+                      <span className="text-xs text-gray-700 dark:text-gray-300">deprecated</span>
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
+              <div className="border-t border-gray-200 dark:border-gray-700 mt-3 pt-3" />
             </div>
 
             {selectedNode.type === 'string' && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">最小长度</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('minLength')}</label>
                   <input
                     type="number"
                     value={selectedNode.minLength || ''}
                     onChange={(e) =>
                       handleUpdate({ minLength: Number(e.target.value) || undefined })
                     }
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">最大长度</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('maxLength')}</label>
                   <input
                     type="number"
                     value={selectedNode.maxLength || ''}
                     onChange={(e) =>
                       handleUpdate({ maxLength: Number(e.target.value) || undefined })
                     }
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">正则模式</label>
-                  <input
-                    type="text"
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('pattern')}</label>
+                  <ClearableInput
                     value={selectedNode.pattern || ''}
-                    onChange={(e) => handleUpdate({ pattern: e.target.value })}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="例如: ^[a-z]+$"
+                    onChange={(e) => handleUpdate({ pattern: e })}
+                    placeholder={t('placeholderPattern')}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">格式</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('format')}</label>
                   <select
                     value={selectedNode.format || ''}
                     onChange={(e) => handleUpdate({ format: e.target.value || undefined })}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">无</option>
-                    <option value="date-time">date-time</option>
+                    <option value="">{t('noFormat')}</option>
+                    <option value="date-time">date-time (RFC 3339)</option>
                     <option value="date">date</option>
                     <option value="time">time</option>
+                    <option value="duration">duration (RFC 3339)</option>
                     <option value="email">email</option>
+                    <option value="idn-email">idn-email</option>
+                    <option value="hostname">hostname</option>
+                    <option value="idn-hostname">idn-hostname</option>
+                    <option value="ipv4">ipv4</option>
+                    <option value="ipv6">ipv6</option>
                     <option value="uri">uri</option>
+                    <option value="uri-reference">uri-reference</option>
+                    <option value="iri">iri</option>
+                    <option value="iri-reference">iri-reference</option>
+                    <option value="uri-template">uri-template</option>
+                    <option value="json-pointer">json-pointer</option>
+                    <option value="relative-json-pointer">relative-json-pointer</option>
+                    <option value="regex">regex</option>
                     <option value="uuid">uuid</option>
                   </select>
                 </div>
@@ -349,38 +447,97 @@ export function PropertyPanel() {
             {(selectedNode.type === 'number' || selectedNode.type === 'integer') && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">最小值</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('minimum')}</label>
                   <input
                     type="number"
                     value={selectedNode.minimum || ''}
                     onChange={(e) =>
                       handleUpdate({ minimum: Number(e.target.value) || undefined })
                     }
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">最大值</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('exclusiveMin')}</label>
+                  <input
+                    type="number"
+                    value={selectedNode.exclusiveMinimum || ''}
+                    onChange={(e) =>
+                      handleUpdate({ exclusiveMinimum: Number(e.target.value) || undefined })
+                    }
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('maximum')}</label>
                   <input
                     type="number"
                     value={selectedNode.maximum || ''}
                     onChange={(e) =>
                       handleUpdate({ maximum: Number(e.target.value) || undefined })
                     }
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('exclusiveMax')}</label>
+                  <input
+                    type="number"
+                    value={selectedNode.exclusiveMaximum || ''}
+                    onChange={(e) =>
+                      handleUpdate({ exclusiveMaximum: Number(e.target.value) || undefined })
+                    }
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('multipleOf')}</label>
+                  <input
+                    type="number"
+                    value={selectedNode.multipleOf || ''}
+                    onChange={(e) =>
+                      handleUpdate({ multipleOf: Number(e.target.value) || undefined })
+                    }
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder={t('placeholderMultipleOf')}
                   />
                 </div>
               </>
             )}
 
+            {selectedNode.type !== 'boolean' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('enum')}</label>
+                <ClearableInput
+                  value={selectedNode.enumRaw || ''}
+                  onChange={(e) => handleUpdate({ enumRaw: e })}
+                  placeholder={t('placeholderEnum')}
+                />
+              </div>
+            )}
+
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">默认值</label>
-              <input
-                type="text"
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('default')}</label>
+              <ClearableInput
                 value={selectedNode.default !== undefined ? String(selectedNode.default) : ''}
-                onChange={(e) => handleUpdate({ default: e.target.value || undefined })}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="默认值"
+                onChange={(e) => {
+                  const inputValue = e;
+                  if (!inputValue) {
+                    handleUpdate({ default: undefined });
+                    return;
+                  }
+                  let defaultValue: any = inputValue;
+                  if (selectedNode.type === 'number' || selectedNode.type === 'integer') {
+                    defaultValue = selectedNode.type === 'integer' ? parseInt(inputValue) : parseFloat(inputValue);
+                    if (isNaN(defaultValue)) {
+                      return;
+                    }
+                  } else if (selectedNode.type === 'boolean') {
+                    defaultValue = inputValue.toLowerCase() === 'true' || inputValue === '1';
+                  }
+                  handleUpdate({ default: defaultValue });
+                }}
+                placeholder={t('placeholderDefault')}
               />
             </div>
           </>

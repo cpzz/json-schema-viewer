@@ -20,11 +20,23 @@ function parseNode(node: any, parentId?: string, order: number = 0): SchemaNode 
   if (node.readOnly !== undefined) schemaNode.readOnly = node.readOnly;
   if (node.writeOnly !== undefined) schemaNode.writeOnly = node.writeOnly;
   if (node.deprecated !== undefined) schemaNode.deprecated = node.deprecated;
-  if (node.enum) schemaNode.enum = node.enum;
+  
+  // Handle enum and const - convert to enumRaw for editing
+  if (node.enum) {
+    schemaNode.enumRaw = node.enum.join(', ');
+  }
+  // Convert const to enumRaw for internal representation
+  if (node.const !== undefined) {
+    schemaNode.enumRaw = String(node.const);
+  }
+  
   if (node.default !== undefined) schemaNode.default = node.default;
   if (node.$ref) schemaNode.$ref = node.$ref;
   if (node.minimum !== undefined) schemaNode.minimum = node.minimum;
   if (node.maximum !== undefined) schemaNode.maximum = node.maximum;
+  if (node.exclusiveMinimum !== undefined) schemaNode.exclusiveMinimum = node.exclusiveMinimum;
+  if (node.exclusiveMaximum !== undefined) schemaNode.exclusiveMaximum = node.exclusiveMaximum;
+  if (node.multipleOf !== undefined) schemaNode.multipleOf = node.multipleOf;
   if (node.minLength !== undefined) schemaNode.minLength = node.minLength;
   if (node.maxLength !== undefined) schemaNode.maxLength = node.maxLength;
   if (node.pattern) schemaNode.pattern = node.pattern;

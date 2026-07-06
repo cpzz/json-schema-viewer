@@ -136,19 +136,21 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
           const isPattern = nodeName.includes('*') || nodeName.startsWith('^') || nodeName.includes('[');
 
           if (isPattern) {
+            const newNode = { ...node, _parentId: current.id, _order: Object.keys(current.patternProperties || {}).length };
             return {
               ...current,
               patternProperties: {
                 ...current.patternProperties,
-                [nodeName]: { ...node, _parentId: current.id },
+                [nodeName]: newNode,
               },
             };
           } else {
+            const newNode = { ...node, _parentId: current.id, _order: Object.keys(current.properties || {}).length };
             return {
               ...current,
               properties: {
-                ...current.properties,
-                [nodeName]: { ...node, _parentId: current.id },
+                ...(current.properties || {}),
+                [nodeName]: newNode,
               },
             };
           }
@@ -156,11 +158,12 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
 
         if (containerKind === 'patternProperties') {
           const nodeName = node.title || `pattern_${Date.now()}`;
+          const newNode = { ...node, _parentId: current.id, _order: Object.keys(current.patternProperties || {}).length };
           return {
             ...current,
             patternProperties: {
               ...current.patternProperties,
-              [nodeName]: { ...node, _parentId: current.id },
+              [nodeName]: newNode,
             },
           };
         }
@@ -174,11 +177,12 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
 
         if (containerKind === 'dependentSchemas') {
           const nodeName = node.title || `dependency_${Date.now()}`;
+          const newNode = { ...node, _parentId: current.id, _order: Object.keys(current.dependentSchemas || {}).length };
           return {
             ...current,
             dependentSchemas: {
               ...current.dependentSchemas,
-              [nodeName]: { ...node, _parentId: current.id },
+              [nodeName]: newNode,
             },
           };
         }
@@ -196,19 +200,21 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
           const isPattern = nodeName.includes('*') || nodeName.startsWith('^') || nodeName.includes('[');
 
           if (isPattern) {
+            const newNode = { ...node, _parentId: current.id, _order: Object.keys(current.patternProperties || {}).length };
             return {
               ...current,
               patternProperties: {
                 ...current.patternProperties,
-                [nodeName]: { ...node, _parentId: current.id },
+                [nodeName]: newNode,
               },
             };
           } else {
+            const newNode = { ...node, _parentId: current.id, _order: Object.keys(current.properties || {}).length };
             return {
               ...current,
               properties: {
-                ...current.properties,
-                [nodeName]: { ...node, _parentId: current.id },
+                ...(current.properties || {}),
+                [nodeName]: newNode,
               },
             };
           }
@@ -277,9 +283,15 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
 
     set({ rootSchema: addNodeRecursive(rootSchema) });
     const editorStore = useEditorStore.getState();
+    // Expand the target object node so the new node is visible
     if (!editorStore.expandedNodes.has(actualParentId)) {
       editorStore.toggleExpand(actualParentId);
     }
+    // When adding through an applicator container, also expand that container so the new node is visible
+    if (containerKind && parentId !== actualParentId && !editorStore.expandedNodes.has(parentId)) {
+      editorStore.toggleExpand(parentId);
+    }
+    // Move focus to the newly created node
     setTimeout(() => {
       useEditorStore.getState().selectNode(node.id);
     }, 0);
@@ -401,12 +413,30 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       }
 
       if (node._containers) {
+        const newContainers = node._containers
+          .filter(c => c.id !== nodeId)
+          .map(c => removeNodeRecursive(c));
+        
         result = {
           ...result,
-          _containers: node._containers
-            .filter(c => c.id !== nodeId)
-            .map(c => removeNodeRecursive(c)),
+          _containers: newContainers,
         };
+
+        // When an applicator container is deleted, also clear the corresponding field
+        const deletedContainer = node._containers.find(c => c.id === nodeId);
+        if (deletedContainer) {
+          if (deletedContainer._nodeKind === 'properties') {
+            result = { ...result, properties: undefined };
+          } else if (deletedContainer._nodeKind === 'patternProperties') {
+            result = { ...result, patternProperties: undefined };
+          } else if (deletedContainer._nodeKind === 'additionalProperties') {
+            result = { ...result, additionalProperties: undefined };
+          } else if (deletedContainer._nodeKind === 'propertyNames') {
+            result = { ...result, propertyNames: undefined };
+          } else if (deletedContainer._nodeKind === 'dependentSchemas') {
+            result = { ...result, dependentSchemas: undefined };
+          }
+        }
       }
 
       if (node.items) {
@@ -439,7 +469,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
 
   renamePropertyKey: (parentId, oldKey, newKey) => {
     const { rootSchema } = get();
-    if (!rootSchema || !newKey || oldKey === newKey) return;
+    if (!rootSchema || oldKey === newKey) return;
 
     const renameKeyRecursive = (node: SchemaNode): SchemaNode => {
       if (node.id === parentId) {
@@ -557,9 +587,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       _order: 0,
     };
 
-    if (type === 'object') {
-      node.properties = {};
-    } else if (type === 'array') {
+    if (type === 'array') {
       node.items = {
         id: createNodeId(),
         type: 'string',

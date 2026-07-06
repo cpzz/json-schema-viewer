@@ -35,3 +35,12 @@ code {
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* Monaco Editor 高亮背景色 */
+.highlight-line-background {
+  background-color: rgba(255, 235, 59, 0.3) !important;
+}
+
+.dark .highlight-line-background {
+  background-color: rgba(255, 235, 59, 0.15) !important;
+}

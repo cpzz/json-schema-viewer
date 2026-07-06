@@ -16,12 +16,14 @@ import {
 } from 'lucide-react';
 import { SchemaNode, SchemaType } from '@/types/schema';
 import { useEditorStore } from '@/stores/editorStore';
+import { useI18n } from '@/stores/languageStore';
 import { NodeMenu } from '@/components/ContextMenu';
 
 interface TreeNodeProps {
   node: SchemaNode;
   level: number;
   parentObject?: SchemaNode;
+  propertyKey?: string;
 }
 
 function getTypeIcon(type: SchemaType) {
@@ -87,13 +89,52 @@ function getContainerChildren(node: SchemaNode, parentObject?: SchemaNode): Sche
   }
 }
 
+function sortByOrder(entries: Array<[string, SchemaNode]>): Array<[string, SchemaNode]> {
+  return entries.sort((a, b) => (a[1]._order ?? 0) - (b[1]._order ?? 0));
+}
+
+function getContainerChildrenWithKeys(
+  node: SchemaNode,
+  parentObject?: SchemaNode
+): Array<[string, SchemaNode]> {
+  if (!parentObject) return [];
+  let entries: Array<[string, SchemaNode]> = [];
+  switch (node._nodeKind) {
+    case 'properties':
+      entries = Object.entries(parentObject.properties || {});
+      break;
+    case 'patternProperties':
+      entries = Object.entries(parentObject.patternProperties || {});
+      break;
+    case 'additionalProperties': {
+      if (parentObject.additionalProperties && typeof parentObject.additionalProperties === 'object') {
+        return [['additionalProperties', parentObject.additionalProperties]];
+      }
+      return [];
+    }
+    case 'propertyNames': {
+      if (parentObject.propertyNames) {
+        return [['propertyNames', parentObject.propertyNames]];
+      }
+      return [];
+    }
+    case 'dependentSchemas':
+      entries = Object.entries(parentObject.dependentSchemas || {});
+      break;
+    default:
+      return [];
+  }
+  return sortByOrder(entries);
+}
+
 function hasContainerChildren(node: SchemaNode, parentObject?: SchemaNode): boolean {
   return getContainerChildren(node, parentObject).length > 0;
 }
 
-function TreeNode({ node, level, parentObject }: TreeNodeProps) {
+function TreeNode({ node, level, parentObject, propertyKey }: TreeNodeProps) {
   const { selectedNodeId, selectNode, expandedNodes, toggleExpand } =
     useEditorStore();
+  const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
@@ -160,10 +201,10 @@ function TreeNode({ node, level, parentObject }: TreeNodeProps) {
     if (node._nodeKind !== 'additionalProperties') return null;
     const value = parentObject?.additionalProperties;
     if (value === undefined || value === false) {
-      return <span className="text-xs text-red-500 ml-1">false</span>;
+      return <span className="text-xs text-red-500 dark:text-red-400 ml-1">false</span>;
     }
     if (value === true) {
-      return <span className="text-xs text-green-500 ml-1">true</span>;
+      return <span className="text-xs text-green-500 dark:text-green-400 ml-1">true</span>;
     }
     return null;
   };
@@ -174,15 +215,15 @@ function TreeNode({ node, level, parentObject }: TreeNodeProps) {
         ref={nodeRef}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
-        className={`group flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-gray-100 ${
-          isSelected ? 'bg-blue-50 border-l-2 border-blue-500' : ''
-        } ${isContainer ? 'bg-gray-50' : ''}`}
+        className={`group flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 ${
+          isSelected ? 'bg-blue-50 dark:bg-blue-900 border-l-2 border-blue-500' : ''
+        } ${isContainer ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
       >
         {hasChildren ? (
           <button
             onClick={handleToggleClick}
-            className="p-0.5 hover:bg-gray-200 rounded shrink-0"
+            className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded shrink-0"
           >
             {isExpanded ? (
               <ChevronDown size={14} />
@@ -196,11 +237,11 @@ function TreeNode({ node, level, parentObject }: TreeNodeProps) {
 
         {isContainer ? getContainerIcon(node._nodeKind) : getTypeIcon(node.type)}
 
-        <span className={`text-sm truncate ${isContainer ? 'text-gray-500 font-medium' : 'font-medium text-gray-900'}`}>
-          {node.title || '未命名'}
+        <span className={`text-sm truncate ${isContainer ? 'text-gray-500 dark:text-gray-400 font-medium' : 'font-medium text-gray-900 dark:text-gray-100'}`}>
+          {node.title || propertyKey || t('unnamed')}
         </span>
         {!isContainer && (
-          <span className="text-xs text-gray-500 ml-1 shrink-0">({node.type})</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 shrink-0">({node.type})</span>
         )}
         {renderAdditionalValue()}
 
@@ -208,10 +249,10 @@ function TreeNode({ node, level, parentObject }: TreeNodeProps) {
           <button
             ref={menuBtnRef}
             onClick={handleMenuBtnClick}
-            className="p-1 rounded hover:bg-gray-200 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 opacity-0 group-hover:opacity-100 transition-opacity"
             title="操作"
           >
-            <MoreHorizontal size={14} className="text-gray-500" />
+            <MoreHorizontal size={14} className="text-gray-500 dark:text-gray-400" />
           </button>
           {menuOpen && (
             <NodeMenu
@@ -229,8 +270,8 @@ function TreeNode({ node, level, parentObject }: TreeNodeProps) {
         <div>
           {isContainer ? (
             // 容器节点：渲染虚拟子节点
-            getContainerChildren(node, parentObject).map((child) => (
-              <TreeNode key={child.id} node={child} level={level + 1} />
+            getContainerChildrenWithKeys(node, parentObject).map(([key, child]) => (
+              <TreeNode key={child.id} node={child} level={level + 1} propertyKey={key} />
             ))
           ) : (
             // 普通节点
@@ -240,17 +281,17 @@ function TreeNode({ node, level, parentObject }: TreeNodeProps) {
                 <TreeNode key={container.id} node={container} level={level + 1} parentObject={node} />
               ))}
               {/* 普通子节点：仅当没有 _containers 时直接渲染 */}
-              {!node._containers && node.properties && Object.entries(node.properties).map(([, child]) => (
-                <TreeNode key={child.id} node={child} level={level + 1} />
+              {!node._containers && node.properties && sortByOrder(Object.entries(node.properties)).map(([key, child]) => (
+                <TreeNode key={child.id} node={child} level={level + 1} propertyKey={key} />
               ))}
-              {!node._containers && node.patternProperties && Object.entries(node.patternProperties).map(([, child]) => (
-                <TreeNode key={child.id} node={child} level={level + 1} />
+              {!node._containers && node.patternProperties && sortByOrder(Object.entries(node.patternProperties)).map(([key, child]) => (
+                <TreeNode key={child.id} node={child} level={level + 1} propertyKey={key} />
               ))}
               {node.items && !Array.isArray(node.items) && (
                 <TreeNode node={node.items} level={level + 1} />
               )}
-              {node.items && Array.isArray(node.items) && node.items.map((item) => (
-                <TreeNode key={item.id} node={item} level={level + 1} />
+              {node.items && Array.isArray(node.items) && node.items.map((item, index) => (
+                <TreeNode key={item.id} node={item} level={level + 1} propertyKey={`[${index}]`} />
               ))}
             </>
           )}
@@ -266,16 +307,17 @@ interface TreeEditorProps {
 }
 
 export function TreeEditor({ schema, onAddRootNode }: TreeEditorProps) {
+  const { t } = useI18n();
   if (!schema) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-400">
+      <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500 bg-white dark:bg-gray-900">
         <div className="text-center">
-          <p className="mb-4">暂无 Schema</p>
+          <p className="mb-4">{t('noSchema')}</p>
           <button
             onClick={onAddRootNode}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            创建根节点
+            {t('createRootNode')}
           </button>
         </div>
       </div>
@@ -283,8 +325,8 @@ export function TreeEditor({ schema, onAddRootNode }: TreeEditorProps) {
   }
 
   return (
-    <div className="flex-1 overflow-auto bg-white">
-      <TreeNode node={schema} level={0} />
+    <div className="flex-1 overflow-auto bg-white dark:bg-gray-900">
+      <TreeNode node={schema} level={0} propertyKey={schema.title} />
     </div>
   );
 }
