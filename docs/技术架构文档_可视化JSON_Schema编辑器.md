@@ -86,7 +86,7 @@ json-schema-viewer/
 │   │   ├── Toolbar/         # 工具栏
 │   │   ├── TreeEditor/      # 树形编辑器
 │   │   ├── PropertyPanel/   # 属性编辑面板
-│   │   ├── PreviewPanel/    # 预览面板
+│   │   ├── CodePanel/       # JSON 代码面板
 │   │   ├── RefManager/      # 引用管理
 │   │   └── common/          # 通用组件
 │   ├── stores/              # Zustand 状态管理
@@ -288,7 +288,7 @@ interface PropertyPanelProps {
 
 **关键接口**：
 ```typescript
-interface PreviewPanelProps {
+interface CodePanelProps {
   schema: SchemaNode | null;
   onCopyToClipboard: () => void;
 }

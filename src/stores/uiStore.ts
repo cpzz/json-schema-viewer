@@ -4,12 +4,10 @@ import { ContextMenuState } from '@/types/editor';
 interface UIStore {
   contextMenu: ContextMenuState;
   showRefManager: boolean;
-  previewFormat: 'formatted' | 'compressed';
 
   showContextMenu: (x: number, y: number, nodeId: string | null) => void;
   hideContextMenu: () => void;
   toggleRefManager: () => void;
-  setPreviewFormat: (format: 'formatted' | 'compressed') => void;
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -20,7 +18,6 @@ export const useUIStore = create<UIStore>((set) => ({
     nodeId: null,
   },
   showRefManager: false,
-  previewFormat: 'formatted',
 
   showContextMenu: (x, y, nodeId) => {
     set({
@@ -46,9 +43,5 @@ export const useUIStore = create<UIStore>((set) => ({
 
   toggleRefManager: () => {
     set((state) => ({ showRefManager: !state.showRefManager }));
-  },
-
-  setPreviewFormat: (format) => {
-    set({ previewFormat: format });
   },
 }));

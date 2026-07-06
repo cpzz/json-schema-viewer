@@ -62,7 +62,7 @@ json-schema-viewer/
 │   │   ├── Toolbar/      # 工具栏
 │   │   ├── TreeEditor/   # 树形编辑器
 │   │   ├── PropertyPanel/# 属性编辑面板
-│   │   ├── PreviewPanel/ # 预览面板
+│   │   ├── CodePanel/    # JSON 代码面板
 │   │   ├── RefManager/   # 引用管理
 │   │   └── ContextMenu/  # 右键菜单
 │   ├── stores/           # Zustand 状态管理

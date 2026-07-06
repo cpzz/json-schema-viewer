@@ -154,10 +154,6 @@ export function Toolbar() {
       >
         {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
       </button>
-
-      <div className="text-sm text-gray-500 dark:text-gray-400">
-        {isDirty ? t('unsaved') : t('saved')}
-      </div>
     </div>
   );
 }
