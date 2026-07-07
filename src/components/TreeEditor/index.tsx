@@ -6,6 +6,7 @@ import {
   Box,
   List,
   Hash,
+  Sigma,
   ToggleLeft,
   CircleOff,
   MoreHorizontal,
@@ -31,6 +32,7 @@ function getTypeIcon(type: SchemaType) {
     case 'string':
       return <Type size={14} className="text-green-600" />;
     case 'number':
+      return <Sigma size={14} className="text-blue-600" />;
     case 'integer':
       return <Hash size={14} className="text-blue-600" />;
     case 'boolean':

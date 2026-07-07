@@ -29,7 +29,7 @@ export function CodePanel({ schema, jsonContent, lineMapRef }: CodePanelProps) {
       return;
     }
 
-    const lineNumber = lineMapRef.current.get(selectedNodeId);
+    const lineNumber = lineMapRef.current?.get(selectedNodeId);
     if (lineNumber && editorRef.current) {
       const editor = editorRef.current;
       const monaco = monacoRef.current;

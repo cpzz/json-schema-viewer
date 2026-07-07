@@ -7,12 +7,14 @@ import { findNodeById } from '@/utils/treeUtils';
 import {
   Type,
   Hash,
+  Sigma,
   ToggleLeft,
   Box,
   List,
   Copy,
   Trash2,
   TableProperties,
+  CircleOff,
 } from 'lucide-react';
 
 interface NodeMenuProps {
@@ -32,10 +34,12 @@ export function NodeMenu({ nodeId, nodeType, nodeKind, anchorRef, onClose }: Nod
   // Define constants first so they can be used in calculations
   const ADD_ITEMS: { type: SchemaType; label: string; icon: typeof Type }[] = [
     { type: 'string', label: t('addString') || '字符串', icon: Type },
-    { type: 'number', label: t('addNumber') || '数字', icon: Hash },
+    { type: 'number', label: t('addNumber') || '数字', icon: Sigma },
+    { type: 'integer', label: t('addInteger') || '整数', icon: Hash },
     { type: 'boolean', label: t('addBoolean') || '布尔值', icon: ToggleLeft },
     { type: 'object', label: t('addObject') || '对象', icon: Box },
     { type: 'array', label: t('addArray') || '数组', icon: List },
+    { type: 'null', label: t('addNull') || 'Null', icon: CircleOff },
   ];
 
   const APPLICATOR_KINDS: Array<{ kind: NodeKind; label: string }> = [
