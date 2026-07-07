@@ -5,6 +5,10 @@ export function generateJsonSchema(node: SchemaNode): any {
     type: node.type,
   };
 
+  if (!node._parentId) {
+    schema.$schema = 'https://json-schema.org/draft/2020-12/schema';
+  }
+
   if (node.title) schema.title = node.title;
   if (node.description) schema.description = node.description;
   if (node.$comment) schema.$comment = node.$comment;
@@ -52,6 +56,11 @@ export function generateJsonSchema(node: SchemaNode): any {
   if (node.exclusiveMinimum !== undefined) schema.exclusiveMinimum = node.exclusiveMinimum;
   if (node.exclusiveMaximum !== undefined) schema.exclusiveMaximum = node.exclusiveMaximum;
   if (node.multipleOf !== undefined) schema.multipleOf = node.multipleOf;
+  if (node.minItems !== undefined) schema.minItems = node.minItems;
+  if (node.maxItems !== undefined) schema.maxItems = node.maxItems;
+  if (node.uniqueItems !== undefined) schema.uniqueItems = node.uniqueItems;
+  if (node.minContains !== undefined) schema.minContains = node.minContains;
+  if (node.maxContains !== undefined) schema.maxContains = node.maxContains;
   if (node.minLength !== undefined) schema.minLength = node.minLength;
   if (node.maxLength !== undefined) schema.maxLength = node.maxLength;
   if (node.pattern) schema.pattern = node.pattern;
@@ -124,11 +133,27 @@ export function generateJsonSchema(node: SchemaNode): any {
     }
   }
 
-  if (node.type === 'array' && node.items) {
-    if (Array.isArray(node.items)) {
-      schema.items = node.items.map((item) => generateJsonSchema(item));
-    } else {
+  if (node.type === 'array') {
+    const hasPrefixItemsContainer = node._containers?.some(c => c._nodeKind === 'prefixItems');
+    const hasItemsContainer = node._containers?.some(c => c._nodeKind === 'items');
+    const hasContainsContainer = node._containers?.some(c => c._nodeKind === 'contains');
+
+    if ((node.prefixItems && node.prefixItems.length > 0) || hasPrefixItemsContainer) {
+      schema.prefixItems = (node.prefixItems || []).map((item) => generateJsonSchema(item));
+    }
+
+    if (node.items === false) {
+      schema.items = false;
+    } else if (node.items) {
       schema.items = generateJsonSchema(node.items);
+    } else if (hasItemsContainer) {
+      schema.items = {};
+    }
+
+    if (node.contains) {
+      schema.contains = generateJsonSchema(node.contains);
+    } else if (hasContainsContainer) {
+      schema.contains = {};
     }
   }
 
@@ -246,17 +271,53 @@ export function generateJsonSchemaWithLineMap(
     }
     
     // 为 items 中的节点标记行号
-    if (schemaNode.items && jsonObj.items) {
-      const itemsLine = lines.findIndex((l, i) => i >= currentLine && l.includes('"items"'));
-      if (itemsLine >= 0) {
-        if (Array.isArray(schemaNode.items)) {
-          schemaNode.items.forEach((child, idx) => {
-            lineMap.set(child.id, itemsLine + 1);
-            markNodeLines(child, jsonObj.items[idx], itemsLine);
-          });
-        } else {
-          lineMap.set(schemaNode.items.id, itemsLine + 1);
-          markNodeLines(schemaNode.items, jsonObj.items, itemsLine);
+    const itemsLine = lines.findIndex((l, i) => i >= currentLine && l.includes('"items"'));
+    if (itemsLine >= 0) {
+      const itemsContainer = schemaNode._containers?.find(c => c._nodeKind === 'items');
+      if (itemsContainer) {
+        lineMap.set(itemsContainer.id, itemsLine + 1);
+      }
+      if (schemaNode.items && jsonObj.items) {
+        const childLine = lines.findIndex((l, i) => i > itemsLine && l.includes('"type"'));
+        if (childLine >= 0) {
+          lineMap.set(schemaNode.items.id, childLine + 1);
+          markNodeLines(schemaNode.items, jsonObj.items, childLine);
+        }
+      }
+    }
+
+    // 为 prefixItems 中的节点标记行号
+    const prefixItemsLine = lines.findIndex((l, i) => i >= currentLine && l.includes('"prefixItems"'));
+    if (prefixItemsLine >= 0) {
+      const prefixItemsContainer = schemaNode._containers?.find(c => c._nodeKind === 'prefixItems');
+      if (prefixItemsContainer) {
+        lineMap.set(prefixItemsContainer.id, prefixItemsLine + 1);
+      }
+      if (schemaNode.prefixItems && jsonObj.prefixItems) {
+        let cursor = prefixItemsLine;
+        schemaNode.prefixItems.forEach((child, idx) => {
+          const childLine = lines.findIndex((l, i) => i > cursor && l.includes('"type"'));
+          if (childLine >= 0) {
+            lineMap.set(child.id, childLine + 1);
+            markNodeLines(child, jsonObj.prefixItems[idx], childLine);
+            cursor = childLine;
+          }
+        });
+      }
+    }
+
+    // 为 contains 节点标记行号
+    const containsLine = lines.findIndex((l, i) => i >= currentLine && l.includes('"contains"'));
+    if (containsLine >= 0) {
+      const containsContainer = schemaNode._containers?.find(c => c._nodeKind === 'contains');
+      if (containsContainer) {
+        lineMap.set(containsContainer.id, containsLine + 1);
+      }
+      if (schemaNode.contains && jsonObj.contains) {
+        const childLine = lines.findIndex((l, i) => i > containsLine && l.includes('"type"'));
+        if (childLine >= 0) {
+          lineMap.set(schemaNode.contains.id, childLine + 1);
+          markNodeLines(schemaNode.contains, jsonObj.contains, childLine);
         }
       }
     }

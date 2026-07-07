@@ -37,6 +37,11 @@ function parseNode(node: any, parentId?: string, order: number = 0): SchemaNode 
   if (node.exclusiveMinimum !== undefined) schemaNode.exclusiveMinimum = node.exclusiveMinimum;
   if (node.exclusiveMaximum !== undefined) schemaNode.exclusiveMaximum = node.exclusiveMaximum;
   if (node.multipleOf !== undefined) schemaNode.multipleOf = node.multipleOf;
+  if (node.minItems !== undefined) schemaNode.minItems = node.minItems;
+  if (node.maxItems !== undefined) schemaNode.maxItems = node.maxItems;
+  if (node.uniqueItems !== undefined) schemaNode.uniqueItems = node.uniqueItems;
+  if (node.minContains !== undefined) schemaNode.minContains = node.minContains;
+  if (node.maxContains !== undefined) schemaNode.maxContains = node.maxContains;
   if (node.minLength !== undefined) schemaNode.minLength = node.minLength;
   if (node.maxLength !== undefined) schemaNode.maxLength = node.maxLength;
   if (node.pattern) schemaNode.pattern = node.pattern;
@@ -154,13 +159,54 @@ function parseNode(node: any, parentId?: string, order: number = 0): SchemaNode 
     }
   }
 
-  if (node.type === 'array' && node.items) {
-    if (Array.isArray(node.items)) {
-      schemaNode.items = node.items.map((item: any, idx: number) =>
+  if (node.type === 'array') {
+    const containers: SchemaNode[] = [];
+
+    if (Object.prototype.hasOwnProperty.call(node, 'items')) {
+      containers.push({
+        id: createNodeId(),
+        type: 'array',
+        title: 'items',
+        _nodeKind: 'items',
+        _order: containers.length,
+        _parentId: schemaNode.id,
+      });
+    }
+
+    if (Array.isArray(node.prefixItems)) {
+      containers.push({
+        id: createNodeId(),
+        type: 'array',
+        title: 'prefixItems',
+        _nodeKind: 'prefixItems',
+        _order: containers.length,
+        _parentId: schemaNode.id,
+      });
+      schemaNode.prefixItems = node.prefixItems.map((item: any, idx: number) =>
         parseNode(item, schemaNode.id, idx)
       );
-    } else {
+    }
+
+    if (node.items === false) {
+      schemaNode.items = false;
+    } else if (node.items && typeof node.items === 'object' && !Array.isArray(node.items)) {
       schemaNode.items = parseNode(node.items, schemaNode.id, 0);
+    }
+
+    if (node.contains && typeof node.contains === 'object') {
+      containers.push({
+        id: createNodeId(),
+        type: 'array',
+        title: 'contains',
+        _nodeKind: 'contains',
+        _order: containers.length,
+        _parentId: schemaNode.id,
+      });
+      schemaNode.contains = parseNode(node.contains, schemaNode.id, 0);
+    }
+
+    if (containers.length > 0) {
+      schemaNode._containers = containers;
     }
   }
 
@@ -179,6 +225,6 @@ function inferType(node: any): SchemaType {
     return node.type as SchemaType;
   }
   if (node.properties) return 'object';
-  if (node.items) return 'array';
+  if (node.items || node.prefixItems || node.contains) return 'array';
   return 'object';
 }

@@ -82,6 +82,8 @@ export function PropertyPanel() {
     Object.keys(parentNode.properties).includes(propertyKey);
 
   const isRequired = isDirectProperty && (parentNode?.required || []).includes(propertyKey);
+  const isContainsChild = parentNode?.type === 'array' && parentNode.contains?.id === selectedNodeId;
+  const isItemsContainer = selectedNode?._nodeKind === 'items';
 
   const isObjectNode = selectedNode?.type === 'object' && !selectedNode?._nodeKind;
 
@@ -125,6 +127,9 @@ export function PropertyPanel() {
       additionalProperties: t('additionalProperties'),
       propertyNames: t('propertyNames'),
       dependentSchemas: t('dependentSchemas'),
+      items: t('arrayItemsNode'),
+      prefixItems: t('arrayPrefixItemsNode'),
+      contains: t('arrayContainsNode'),
     };
 
     const containerLabel = containerLabels[selectedNode._nodeKind] || selectedNode._nodeKind;
@@ -150,10 +155,37 @@ export function PropertyPanel() {
             </div>
           </div>
         )}
+
+        {selectedNode._nodeKind === 'items' && parentNode?.type === 'array' && (
+          <div className="space-y-4 mb-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name={`items-mode-${selectedNode.id}`}
+                checked={parentNode.items !== false}
+                onChange={() => updateNode(parentNode.id, { items: undefined })}
+                className="border-gray-300 dark:border-gray-600"
+              />
+              <span className="text-xs text-gray-700 dark:text-gray-300">{t('arrayItemsSchema')}</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name={`items-mode-${selectedNode.id}`}
+                checked={parentNode.items === false}
+                onChange={() => updateNode(parentNode.id, { items: false })}
+                className="border-gray-300 dark:border-gray-600"
+              />
+              <span className="text-xs text-gray-700 dark:text-gray-300">{t('arrayItemsFalse')}</span>
+            </label>
+          </div>
+        )}
         
-        <div className="text-xs text-gray-400 dark:text-gray-500">
-          {t('addChildItem')}
-        </div>
+        {(!isItemsContainer || (parentNode?.items !== false && parentNode?.items !== undefined)) && (
+          <div className="text-xs text-gray-400 dark:text-gray-500">
+            {t('addChildItem')}
+          </div>
+        )}
       </div>
     );
   }
@@ -173,7 +205,7 @@ export function PropertyPanel() {
       </h3>
 
       <div className="space-y-4">
-        {parentNode && !isAdditionalPropertyChild && (
+        {parentNode?.type === 'object' && !isAdditionalPropertyChild && (
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               {t('propertyKey')}
@@ -534,6 +566,76 @@ export function PropertyPanel() {
                     }
                     className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder={t('placeholderMultipleOf')}
+                  />
+                </div>
+              </>
+            )}
+
+            {selectedNode.type === 'array' && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('minItems') || 'Min Items'}</label>
+                  <input
+                    type="number"
+                    value={selectedNode.minItems ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      handleUpdate({ minItems: value === '' ? undefined : Number(value) });
+                    }}
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('maxItems') || 'Max Items'}</label>
+                  <input
+                    type="number"
+                    value={selectedNode.maxItems ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      handleUpdate({ maxItems: value === '' ? undefined : Number(value) });
+                    }}
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selectedNode.uniqueItems === true}
+                    onChange={(e) => handleUpdate({ uniqueItems: e.target.checked || undefined })}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  <span className="text-xs text-gray-700 dark:text-gray-300">{t('uniqueItemsLabel')}</span>
+                </label>
+              </>
+            )}
+
+            {isContainsChild && parentNode && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('minContains')}</label>
+                  <input
+                    type="number"
+                    value={parentNode.minContains ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      updateNode(parentNode.id, { minContains: value === '' ? undefined : Number(value) });
+                    }}
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('maxContains')}</label>
+                  <input
+                    type="number"
+                    value={parentNode.maxContains ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      updateNode(parentNode.id, { maxContains: value === '' ? undefined : Number(value) });
+                    }}
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </>

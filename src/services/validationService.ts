@@ -1,8 +1,8 @@
-import Ajv from 'ajv';
+import Ajv2020 from 'ajv/dist/2020';
 import { SchemaNode, ValidationResult } from '@/types/schema';
 import { generateJsonSchema } from '@/utils/schemaGenerator';
 
-const ajv = new Ajv({ allErrors: true, strict: false });
+const ajv = new Ajv2020({ allErrors: true, strict: false });
 
 export function validateSchema(node: SchemaNode | null): ValidationResult {
   if (!node) {

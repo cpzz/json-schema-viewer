@@ -1,6 +1,6 @@
 import { SchemaNode } from '@/types/schema';
 
-/** 遍历节点的 properties、patternProperties、additionalProperties、propertyNames、dependentSchemas、_containers、items 中的子节点 */
+/** 遍历节点的 properties、patternProperties、additionalProperties、propertyNames、dependentSchemas、_containers、items、prefixItems、contains 中的子节点 */
 function forEachChild(
   node: SchemaNode,
   fn: (child: SchemaNode) => void
@@ -32,13 +32,15 @@ function forEachChild(
     }
   }
   if (node.items) {
-    if (Array.isArray(node.items)) {
-      for (const item of node.items) {
-        fn(item);
-      }
-    } else {
-      fn(node.items);
+    fn(node.items);
+  }
+  if (node.prefixItems) {
+    for (const item of node.prefixItems) {
+      fn(item);
     }
+  }
+  if (node.contains) {
+    fn(node.contains);
   }
 }
 
@@ -112,19 +114,24 @@ export function getNodePath(
   }
 
   if (root.items) {
-    if (Array.isArray(root.items)) {
-      for (let i = 0; i < root.items.length; i++) {
-        const result = getNodePath(root.items[i], nodeId, [
-          ...path,
-          'items',
-          String(i),
-        ]);
-        if (result) return result;
-      }
-    } else {
-      const result = getNodePath(root.items, nodeId, [...path, 'items']);
+    const result = getNodePath(root.items, nodeId, [...path, 'items']);
+    if (result) return result;
+  }
+
+  if (root.prefixItems) {
+    for (let i = 0; i < root.prefixItems.length; i++) {
+      const result = getNodePath(root.prefixItems[i], nodeId, [
+        ...path,
+        'prefixItems',
+        String(i),
+      ]);
       if (result) return result;
     }
+  }
+
+  if (root.contains) {
+    const result = getNodePath(root.contains, nodeId, [...path, 'contains']);
+    if (result) return result;
   }
 
   return null;

@@ -10,6 +10,7 @@ interface SchemaStore {
   setRootSchema: (schema: SchemaNode) => void;
   updateNode: (nodeId: string, updates: Partial<SchemaNode>) => void;
   addNode: (parentId: string | null, node: SchemaNode) => void;
+  addArrayContainer: (arrayNodeId: string, target: 'items' | 'prefixItems' | 'contains') => void;
   removeNode: (nodeId: string) => void;
   moveNode: (nodeId: string, newParentId: string, newIndex: number) => void;
   renamePropertyKey: (parentId: string, oldKey: string, newKey: string) => void;
@@ -94,14 +95,18 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       }
 
       if (node.items) {
-        if (Array.isArray(node.items)) {
-          result = {
-            ...result,
-            items: node.items.map((item) => updateNodeRecursive(item)),
-          };
-        } else {
-          result = { ...result, items: updateNodeRecursive(node.items) };
-        }
+        result = { ...result, items: updateNodeRecursive(node.items) };
+      }
+
+      if (node.prefixItems) {
+        result = {
+          ...result,
+          prefixItems: node.prefixItems.map((item) => updateNodeRecursive(item)),
+        };
+      }
+
+      if (node.contains) {
+        result = { ...result, contains: updateNodeRecursive(node.contains) };
       }
 
       return result;
@@ -195,6 +200,27 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
           };
         }
 
+        if (containerKind === 'items') {
+          return {
+            ...current,
+            items: { ...node, _parentId: current.id, _order: 0 },
+          };
+        }
+
+        if (containerKind === 'prefixItems') {
+          return {
+            ...current,
+            prefixItems: [...(current.prefixItems || []), { ...node, _parentId: current.id, _order: (current.prefixItems || []).length }],
+          };
+        }
+
+        if (containerKind === 'contains') {
+          return {
+            ...current,
+            contains: { ...node, _parentId: current.id, _order: 0 },
+          };
+        }
+
         // 直接向 object 节点添加子节点（原有的逻辑）
         if (current.type === 'object') {
           const nodeName = node.title || `property_${Date.now()}`;
@@ -219,11 +245,6 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
               },
             };
           }
-        } else if (current.type === 'array') {
-          return {
-            ...current,
-            items: { ...node, _parentId: current.id },
-          };
         }
       }
 
@@ -269,14 +290,18 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       }
 
       if (current.items) {
-        if (Array.isArray(current.items)) {
-          result = {
-            ...result,
-            items: current.items.map((item) => addNodeRecursive(item)),
-          };
-        } else {
-          result = { ...result, items: addNodeRecursive(current.items) };
-        }
+        result = { ...result, items: addNodeRecursive(current.items) };
+      }
+
+      if (current.prefixItems) {
+        result = {
+          ...result,
+          prefixItems: current.prefixItems.map((item) => addNodeRecursive(item)),
+        };
+      }
+
+      if (current.contains) {
+        result = { ...result, contains: addNodeRecursive(current.contains) };
       }
 
       return result;
@@ -296,6 +321,107 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     setTimeout(() => {
       useEditorStore.getState().selectNode(node.id);
     }, 0);
+  },
+
+  addArrayContainer: (arrayNodeId, target) => {
+    const { rootSchema } = get();
+    if (!rootSchema) return;
+
+    const addArrayContainerRecursive = (current: SchemaNode): SchemaNode => {
+      if (current.id === arrayNodeId && current.type === 'array') {
+        const exists = current._containers?.some((container) => container._nodeKind === target);
+        if (exists) return current;
+
+        return {
+          ...current,
+          _containers: [
+            ...(current._containers || []),
+            {
+              id: createNodeId(),
+              type: 'array',
+              title: target,
+              _nodeKind: target,
+              _order: (current._containers || []).length,
+              _parentId: current.id,
+            },
+          ],
+        };
+      }
+
+      let result: SchemaNode = current;
+
+      if (current.properties) {
+        const newProperties: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(current.properties)) {
+          newProperties[key] = addArrayContainerRecursive(child);
+        }
+        result = { ...result, properties: newProperties };
+      }
+
+      if (current.patternProperties) {
+        const newPatternProperties: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(current.patternProperties)) {
+          newPatternProperties[key] = addArrayContainerRecursive(child);
+        }
+        result = { ...result, patternProperties: newPatternProperties };
+      }
+
+      if (current.additionalProperties && typeof current.additionalProperties === 'object') {
+        result = { ...result, additionalProperties: addArrayContainerRecursive(current.additionalProperties) };
+      }
+
+      if (current.propertyNames) {
+        result = { ...result, propertyNames: addArrayContainerRecursive(current.propertyNames) };
+      }
+
+      if (current.dependentSchemas) {
+        const newDependentSchemas: Record<string, SchemaNode> = {};
+        for (const [key, child] of Object.entries(current.dependentSchemas)) {
+          newDependentSchemas[key] = addArrayContainerRecursive(child);
+        }
+        result = { ...result, dependentSchemas: newDependentSchemas };
+      }
+
+      if (current._containers) {
+        result = {
+          ...result,
+          _containers: current._containers.map((container) => addArrayContainerRecursive(container)),
+        };
+      }
+
+      if (current.items) {
+        result = { ...result, items: addArrayContainerRecursive(current.items) };
+      }
+
+      if (current.prefixItems) {
+        result = {
+          ...result,
+          prefixItems: current.prefixItems.map((item) => addArrayContainerRecursive(item)),
+        };
+      }
+
+      if (current.contains) {
+        result = { ...result, contains: addArrayContainerRecursive(current.contains) };
+      }
+
+      return result;
+    };
+
+    const nextRootSchema = addArrayContainerRecursive(rootSchema);
+    set({ rootSchema: nextRootSchema });
+
+    const editorStore = useEditorStore.getState();
+    if (!editorStore.expandedNodes.has(arrayNodeId)) {
+      editorStore.toggleExpand(arrayNodeId);
+    }
+
+    const arrayNode = findNodeById(nextRootSchema, arrayNodeId);
+    const containerNode = arrayNode?._containers?.find((container) => container._nodeKind === target);
+    if (containerNode) {
+      setTimeout(() => {
+        useEditorStore.getState().selectNode(containerNode.id);
+      }, 0);
+    }
   },
 
   removeNode: (nodeId) => {
@@ -339,18 +465,21 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         }
       }
       if (node.items) {
-        if (Array.isArray(node.items)) {
-          for (const item of node.items) {
-            if (item.id === targetId) return node.id;
-            const found = findParentId(item, targetId);
-            if (found) return found;
-          }
-        } else if (node.items.id === targetId) {
-          return node.id;
-        } else {
-          const found = findParentId(node.items, targetId);
+        if (node.items.id === targetId) return node.id;
+        const found = findParentId(node.items, targetId);
+        if (found) return found;
+      }
+      if (node.prefixItems) {
+        for (const item of node.prefixItems) {
+          if (item.id === targetId) return node.id;
+          const found = findParentId(item, targetId);
           if (found) return found;
         }
+      }
+      if (node.contains) {
+        if (node.contains.id === targetId) return node.id;
+        const found = findParentId(node.contains, targetId);
+        if (found) return found;
       }
       if (node._containers) {
         for (const container of node._containers) {
@@ -444,22 +573,38 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
             result = { ...result, propertyNames: undefined };
           } else if (deletedContainer._nodeKind === 'dependentSchemas') {
             result = { ...result, dependentSchemas: undefined };
+          } else if (deletedContainer._nodeKind === 'items') {
+            result = { ...result, items: undefined };
+          } else if (deletedContainer._nodeKind === 'prefixItems') {
+            result = { ...result, prefixItems: undefined };
+          } else if (deletedContainer._nodeKind === 'contains') {
+            result = { ...result, contains: undefined, minContains: undefined, maxContains: undefined };
           }
         }
       }
 
       if (node.items) {
-        if (Array.isArray(node.items)) {
-          result = {
-            ...result,
-            items: node.items
-              .filter((item) => item.id !== nodeId)
-              .map((item) => removeNodeRecursive(item)),
-          };
-        } else if (node.items.id === nodeId) {
+        if (node.items.id === nodeId) {
           result = { ...result, items: undefined };
         } else {
           result = { ...result, items: removeNodeRecursive(node.items) };
+        }
+      }
+
+      if (node.prefixItems) {
+        result = {
+          ...result,
+          prefixItems: node.prefixItems
+            .filter((item) => item.id !== nodeId)
+            .map((item, index) => ({ ...removeNodeRecursive(item), _order: index })),
+        };
+      }
+
+      if (node.contains) {
+        if (node.contains.id === nodeId) {
+          result = { ...result, contains: undefined };
+        } else {
+          result = { ...result, contains: removeNodeRecursive(node.contains) };
         }
       }
 
@@ -555,14 +700,18 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       }
 
       if (node.items) {
-        if (Array.isArray(node.items)) {
-          node = {
-            ...node,
-            items: node.items.map((item) => renameKeyRecursive(item)),
-          };
-        } else {
-          node = { ...node, items: renameKeyRecursive(node.items) };
-        }
+        node = { ...node, items: renameKeyRecursive(node.items) };
+      }
+
+      if (node.prefixItems) {
+        node = {
+          ...node,
+          prefixItems: node.prefixItems.map((item) => renameKeyRecursive(item)),
+        };
+      }
+
+      if (node.contains) {
+        node = { ...node, contains: renameKeyRecursive(node.contains) };
       }
 
       return node;
@@ -619,13 +768,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     };
 
     if (type === 'array') {
-      node.items = {
-        id: createNodeId(),
-        type: 'string',
-        title: 'items',
-        _order: 0,
-        _parentId: node.id,
-      };
+      node._containers = [];
     }
 
     return node;
@@ -734,11 +877,15 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
       }
 
       if (node.items) {
-        if (Array.isArray(node.items)) {
-          result = { ...result, items: node.items.map(item => convertRecursive(item)) };
-        } else {
-          result = { ...result, items: convertRecursive(node.items) };
-        }
+        result = { ...result, items: convertRecursive(node.items) };
+      }
+
+      if (node.prefixItems) {
+        result = { ...result, prefixItems: node.prefixItems.map(item => convertRecursive(item)) };
+      }
+
+      if (node.contains) {
+        result = { ...result, contains: convertRecursive(node.contains) };
       }
 
       // 如果当前节点是容器本身，更新类型

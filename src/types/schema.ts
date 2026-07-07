@@ -1,7 +1,16 @@
 export type SchemaType = 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'null';
 
 /** 应用器节点类型 */
-export type NodeKind = 'normal' | 'properties' | 'patternProperties' | 'additionalProperties' | 'propertyNames' | 'dependentSchemas';
+export type NodeKind =
+  | 'normal'
+  | 'properties'
+  | 'patternProperties'
+  | 'additionalProperties'
+  | 'propertyNames'
+  | 'dependentSchemas'
+  | 'items'
+  | 'prefixItems'
+  | 'contains';
 
 export interface SchemaNode {
   id: string;
@@ -18,7 +27,14 @@ export interface SchemaNode {
   additionalProperties?: boolean | SchemaNode;
   propertyNames?: SchemaNode;
   dependentSchemas?: Record<string, SchemaNode>;
-  items?: SchemaNode | SchemaNode[];
+  items?: SchemaNode | false;
+  prefixItems?: SchemaNode[];
+  contains?: SchemaNode;
+  minItems?: number;
+  maxItems?: number;
+  uniqueItems?: boolean;
+  minContains?: number;
+  maxContains?: number;
   required?: string[];
   requiredRaw?: string;
   enum?: any[];

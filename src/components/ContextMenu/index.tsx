@@ -26,7 +26,7 @@ interface NodeMenuProps {
 }
 
 export function NodeMenu({ nodeId, nodeType, nodeKind, anchorRef, onClose }: NodeMenuProps) {
-  const { addNode, removeNode, createNode } = useSchemaStore();
+  const { addNode, addArrayContainer, removeNode, createNode } = useSchemaStore();
   const { copyNode } = useEditorStore();
   const { t } = useI18n();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -50,7 +50,16 @@ export function NodeMenu({ nodeId, nodeType, nodeKind, anchorRef, onClose }: Nod
     { kind: 'dependentSchemas', label: t('dependentSchemas') },
   ];
 
-  const APPLICATOR_KIND_SET = new Set(APPLICATOR_KINDS.map(a => a.kind));
+  const ARRAY_CONTAINER_KINDS: Array<{ kind: NodeKind; label: string }> = [
+    { kind: 'prefixItems', label: t('arrayPrefixItemsNode') },
+    { kind: 'items', label: t('arrayItemsNode') },
+    { kind: 'contains', label: t('arrayContainsNode') },
+  ];
+
+  const APPLICATOR_KIND_SET = new Set([
+    ...APPLICATOR_KINDS.map(a => a.kind),
+    ...ARRAY_CONTAINER_KINDS.map(a => a.kind),
+  ]);
 
   const isApplicatorNode = nodeKind != null && APPLICATOR_KIND_SET.has(nodeKind);
 
@@ -81,6 +90,11 @@ export function NodeMenu({ nodeId, nodeType, nodeKind, anchorRef, onClose }: Nod
   const handleAddChild = (type: SchemaType) => {
     const node = createNode(type);
     addNode(nodeId, node);
+    onClose();
+  };
+
+  const handleAddArrayContainer = (target: 'items' | 'prefixItems' | 'contains') => {
+    addArrayContainer(nodeId, target);
     onClose();
   };
 
@@ -149,7 +163,15 @@ export function NodeMenu({ nodeId, nodeType, nodeKind, anchorRef, onClose }: Nod
     properties: t('addProperties') || '添加属性',
     patternProperties: t('addPatternProperties') || '添加模式属性',
     dependentSchemas: t('addDependentSchemas') || '添加依赖',
+    items: t('arrayAddChildToItems'),
+    prefixItems: t('arrayAddChildToPrefixItems'),
+    contains: t('arrayAddChildToContains'),
   };
+
+  const rootSchema = useSchemaStore.getState().rootSchema;
+  const currentNode = rootSchema ? findNodeById(rootSchema, nodeId) : null;
+  const parentNode = currentNode?._parentId && rootSchema ? findNodeById(rootSchema, currentNode._parentId) : null;
+  const canAddChildrenInItemsContainer = nodeKind !== 'items' || parentNode?.items !== false;
 
   return (
     <div
@@ -162,7 +184,7 @@ export function NodeMenu({ nodeId, nodeType, nodeKind, anchorRef, onClose }: Nod
           <div className="px-3 py-1 text-xs text-gray-400 dark:text-gray-500 font-medium">
             {APPLICATOR_MENU_LABELS[nodeKind!] || t('addNode')}
           </div>
-          {ADD_ITEMS.map(({ type, label, icon: Icon }) => (
+          {canAddChildrenInItemsContainer && ADD_ITEMS.map(({ type, label, icon: Icon }) => (
             <button
               key={type}
               onClick={() => handleAddChild(type)}
@@ -198,20 +220,24 @@ export function NodeMenu({ nodeId, nodeType, nodeKind, anchorRef, onClose }: Nod
         </>
       )}
 
-      {/* array 节点：添加子节点 */}
-      {nodeType === 'array' && (
+      {/* array 节点：创建数组容器 */}
+      {nodeType === 'array' && !isApplicatorNode && (
         <>
           <div className="px-3 py-1 text-xs text-gray-400 dark:text-gray-500 font-medium">{t('addNode')}</div>
-          {ADD_ITEMS.map(({ type, label, icon: Icon }) => (
+          {(() => {
+            const thisNode = rootSchema ? findNodeById(rootSchema, nodeId) : null;
+            const existingKinds = new Set(thisNode?._containers?.map((container) => container._nodeKind) || []);
+            return ARRAY_CONTAINER_KINDS.filter(({ kind }) => !existingKinds.has(kind)).map(({ kind, label }) => (
             <button
-              key={type}
-              onClick={() => handleAddChild(type)}
+              key={kind}
+              onClick={() => handleAddArrayContainer(kind as 'items' | 'prefixItems' | 'contains')}
               className="w-full px-3 py-1.5 text-left text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 whitespace-nowrap"
             >
-              <Icon size={14} className="text-gray-500 dark:text-gray-400 shrink-0" />
+              <TableProperties size={14} className="text-gray-500 dark:text-gray-400 shrink-0" />
               <span>{label}</span>
             </button>
-          ))}
+            ));
+          })()}
           <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
         </>
       )}

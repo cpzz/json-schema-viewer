@@ -60,6 +60,12 @@ function getContainerIcon(kind?: string) {
       return <Key size={14} className="text-amber-500" />;
     case 'dependentSchemas':
       return <GitBranch size={14} className="text-teal-500" />;
+    case 'items':
+      return <List size={14} className="text-pink-500" />;
+    case 'prefixItems':
+      return <List size={14} className="text-rose-500" />;
+    case 'contains':
+      return <List size={14} className="text-fuchsia-500" />;
     default:
       return <FolderOpen size={14} className="text-gray-500" />;
   }
@@ -86,6 +92,20 @@ function getContainerChildren(node: SchemaNode, parentObject?: SchemaNode): Sche
     }
     case 'dependentSchemas':
       return Object.values(parentObject.dependentSchemas || {});
+    case 'items': {
+      if (parentObject.items) {
+        return [parentObject.items];
+      }
+      return [];
+    }
+    case 'prefixItems':
+      return parentObject.prefixItems || [];
+    case 'contains': {
+      if (parentObject.contains) {
+        return [parentObject.contains];
+      }
+      return [];
+    }
     default:
       return [];
   }
@@ -123,10 +143,32 @@ function getContainerChildrenWithKeys(
     case 'dependentSchemas':
       entries = Object.entries(parentObject.dependentSchemas || {});
       break;
+    case 'items': {
+      if (parentObject.items) {
+        return [[tStatic('arrayItemsValue'), parentObject.items]];
+      }
+      return [];
+    }
+    case 'prefixItems':
+      return (parentObject.prefixItems || []).map((child) => ['', child]);
+    case 'contains': {
+      if (parentObject.contains) {
+        return [[tStatic('arrayContainsValue'), parentObject.contains]];
+      }
+      return [];
+    }
     default:
       return [];
   }
   return sortByOrder(entries);
+}
+
+function tStatic(key: 'arrayItemsValue' | 'arrayContainsValue') {
+  const map = {
+    arrayItemsValue: 'schema',
+    arrayContainsValue: 'schema',
+  };
+  return map[key];
 }
 
 function hasContainerChildren(node: SchemaNode, parentObject?: SchemaNode): boolean {
@@ -155,11 +197,19 @@ function TreeNode({ node, level, parentObject, propertyKey }: TreeNodeProps) {
   let children: SchemaNode[] = [];
   if (isContainer) {
     children = getContainerChildren(node, parentObject);
-  } else if (node.items) {
-    if (Array.isArray(node.items)) {
-      children = node.items;
+  } else {
+    if (node._containers) {
+      children = node._containers;
     } else {
-      children = [node.items];
+      if (node.items) {
+        children = [node.items];
+      }
+      if (node.prefixItems) {
+        children = [...children, ...node.prefixItems];
+      }
+      if (node.contains) {
+        children = [...children, node.contains];
+      }
     }
   }
   // 当 _containers 存在时，properties 条目通过容器访问，不在此处渲染
@@ -289,12 +339,15 @@ function TreeNode({ node, level, parentObject, propertyKey }: TreeNodeProps) {
               {!node._containers && node.patternProperties && sortByOrder(Object.entries(node.patternProperties)).map(([key, child]) => (
                 <TreeNode key={child.id} node={child} level={level + 1} propertyKey={key} />
               ))}
-              {node.items && !Array.isArray(node.items) && (
-                <TreeNode node={node.items} level={level + 1} />
+              {!node._containers && node.items && (
+                <TreeNode node={node.items} level={level + 1} propertyKey="items" />
               )}
-              {node.items && Array.isArray(node.items) && node.items.map((item, index) => (
-                <TreeNode key={item.id} node={item} level={level + 1} propertyKey={`[${index}]`} />
+              {!node._containers && node.prefixItems && node.prefixItems.map((item, index) => (
+                <TreeNode key={item.id} node={item} level={level + 1} propertyKey={`prefixItems[${index}]`} />
               ))}
+              {!node._containers && node.contains && (
+                <TreeNode node={node.contains} level={level + 1} propertyKey="contains" />
+              )}
             </>
           )}
         </div>
