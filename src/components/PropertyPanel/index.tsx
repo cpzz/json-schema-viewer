@@ -57,7 +57,7 @@ function getContainerIcon(kind?: string) {
 }
 
 export function PropertyPanel() {
-  const { rootSchema, updateNode, renamePropertyKey } = useSchemaStore();
+  const { rootSchema, updateNode, renamePropertyKey, setRequired } = useSchemaStore();
   const { selectedNodeId } = useEditorStore();
   const { t } = useI18n();
   const [propertyKey, setPropertyKey] = useState('');
@@ -75,6 +75,13 @@ export function PropertyPanel() {
     typeof parentNode.additionalProperties === 'object' &&
     parentNode.additionalProperties !== null &&
     parentNode.additionalProperties.id === selectedNodeId;
+
+  // 判断是否是父 object properties 的直接子属性（不含 patternProperties）
+  const isDirectProperty = parentNode?.type === 'object' && propertyKey !== '' &&
+    parentNode.properties != null &&
+    Object.keys(parentNode.properties).includes(propertyKey);
+
+  const isRequired = isDirectProperty && (parentNode?.required || []).includes(propertyKey);
 
   const isObjectNode = selectedNode?.type === 'object' && !selectedNode?._nodeKind;
 
@@ -104,6 +111,12 @@ export function PropertyPanel() {
     );
   }
 
+  const handleUpdate = (updates: Partial<SchemaNode>) => {
+    if (selectedNodeId) {
+      updateNode(selectedNodeId, updates);
+    }
+  };
+
   // 容器节点显示编辑面板
   if (selectedNode._nodeKind && selectedNode._nodeKind !== 'normal') {
     const containerLabels: Record<string, string> = {
@@ -122,18 +135,28 @@ export function PropertyPanel() {
           {t('propertyType')}: {getContainerIcon(selectedNode._nodeKind)}
           {containerLabel}
         </h3>
+        
+        {selectedNode._nodeKind === 'patternProperties' && (
+          <div className="space-y-4 mb-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('forPatternProperties')}
+              </label>
+              <ClearableInput
+                value={selectedNode.requiredRaw || ''}
+                onChange={(e) => handleUpdate({ requiredRaw: e })}
+                placeholder={t('placeholderRequiredKeys')}
+              />
+            </div>
+          </div>
+        )}
+        
         <div className="text-xs text-gray-400 dark:text-gray-500">
           {t('addChildItem')}
         </div>
       </div>
     );
   }
-
-  const handleUpdate = (updates: Partial<SchemaNode>) => {
-    if (selectedNodeId) {
-      updateNode(selectedNodeId, updates);
-    }
-  };
 
   const handlePropertyKeyChange = (newKey: string) => {
     if (parentNode && propertyKey !== newKey) {
@@ -160,6 +183,17 @@ export function PropertyPanel() {
               onChange={(e) => handlePropertyKeyChange(e)}
               placeholder={t('placeholderPropertyName')}
             />
+            {isDirectProperty && (
+              <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isRequired}
+                  onChange={(e) => setRequired(parentNode.id, propertyKey, e.target.checked)}
+                  className="rounded border-gray-300 dark:border-gray-600"
+                />
+                <span className="text-xs text-gray-700 dark:text-gray-300">{t('required')}</span>
+              </label>
+            )}
           </div>
         )}
 

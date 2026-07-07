@@ -13,6 +13,8 @@ export const translations = {
     // PropertyPanel
     propertyType: 'Property Type',
     propertyKey: 'Property Key',
+    required: 'Required',
+    forPatternProperties: 'Pattern',
     title: 'Title',
     annotation: 'Annotation',
     description: 'Description',
@@ -74,6 +76,7 @@ export const translations = {
     placeholderMultipleOf: 'e.g., 5 (value must be multiple of 5)',
     placeholderEnum: 'comma-separated, e.g., value1, value2, 123',
     placeholderDefault: 'Default value',
+    placeholderRequiredKeys: 'comma-separated required keys',
     codeTitle: 'JSON Code',
     formatted: 'Formatted',
     compressed: 'Compressed',
@@ -119,6 +122,8 @@ export const translations = {
     // PropertyPanel
     propertyType: '属性类型',
     propertyKey: '属性名',
+    required: '必填',
+    forPatternProperties: '模式',
     title: '标题',
     annotation: '注释',
     description: '描述',
@@ -180,6 +185,7 @@ export const translations = {
     placeholderMultipleOf: '例如: 5 (值必须是5的倍数)',
     placeholderEnum: '逗号分隔，例如: value1, value2, 123',
     placeholderDefault: '默认值',
+    placeholderRequiredKeys: '逗号分隔的必填键，例如: key1, key2',
     codeTitle: 'JSON 代码',
     formatted: '格式化',
     compressed: '压缩',

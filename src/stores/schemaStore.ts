@@ -13,6 +13,7 @@ interface SchemaStore {
   removeNode: (nodeId: string) => void;
   moveNode: (nodeId: string, newParentId: string, newIndex: number) => void;
   renamePropertyKey: (parentId: string, oldKey: string, newKey: string) => void;
+  setRequired: (parentId: string, propertyKey: string, required: boolean) => void;
 
   addDefinition: (name: string, schema: SchemaNode) => void;
   updateDefinition: (name: string, schema: SchemaNode) => void;
@@ -368,12 +369,20 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
 
       if (node.properties) {
         const newProperties: Record<string, SchemaNode> = {};
+        const removedKeys: string[] = [];
         for (const [key, child] of Object.entries(node.properties)) {
           if (child.id !== nodeId) {
             newProperties[key] = removeNodeRecursive(child);
+          } else {
+            removedKeys.push(key);
           }
         }
         result = { ...result, properties: newProperties };
+        // 同步清理 required 数组
+        if (removedKeys.length > 0 && result.required) {
+          const newRequired = result.required.filter((k) => !removedKeys.includes(k));
+          result = { ...result, required: newRequired.length > 0 ? newRequired : undefined };
+        }
       }
 
       if (node.patternProperties) {
@@ -426,7 +435,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         const deletedContainer = node._containers.find(c => c.id === nodeId);
         if (deletedContainer) {
           if (deletedContainer._nodeKind === 'properties') {
-            result = { ...result, properties: undefined };
+            result = { ...result, properties: undefined, required: undefined };
           } else if (deletedContainer._nodeKind === 'patternProperties') {
             result = { ...result, patternProperties: undefined };
           } else if (deletedContainer._nodeKind === 'additionalProperties') {
@@ -479,7 +488,11 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
           const childNode = newProperties[oldKey];
           delete newProperties[oldKey];
           newProperties[newKey] = childNode;
-          return { ...node, properties: newProperties };
+          // 同步更新 required 数组
+          const newRequired = node.required
+            ? node.required.map((k) => (k === oldKey ? newKey : k))
+            : undefined;
+          return { ...node, properties: newProperties, required: newRequired };
         }
         // 处理 patternProperties
         if (node.patternProperties && oldKey in node.patternProperties) {
@@ -556,6 +569,24 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     };
 
     set({ rootSchema: renameKeyRecursive(rootSchema) });
+  },
+
+  setRequired: (parentId, propertyKey, required) => {
+    const { rootSchema, updateNode } = get();
+    if (!rootSchema) return;
+    const parentNode = findNodeById(rootSchema, parentId);
+    if (!parentNode || parentNode.type !== 'object') return;
+
+    const currentRequired = parentNode.required || [];
+    let newRequired: string[];
+    if (required) {
+      newRequired = currentRequired.includes(propertyKey)
+        ? currentRequired
+        : [...currentRequired, propertyKey];
+    } else {
+      newRequired = currentRequired.filter((k) => k !== propertyKey);
+    }
+    updateNode(parentId, { required: newRequired.length > 0 ? newRequired : undefined });
   },
 
   addDefinition: (name, schema) => {

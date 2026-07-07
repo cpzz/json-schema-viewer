@@ -20,6 +20,7 @@ export interface SchemaNode {
   dependentSchemas?: Record<string, SchemaNode>;
   items?: SchemaNode | SchemaNode[];
   required?: string[];
+  requiredRaw?: string;
   enum?: any[];
   enumRaw?: string;
   const?: any;

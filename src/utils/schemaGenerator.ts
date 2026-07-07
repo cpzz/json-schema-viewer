@@ -62,9 +62,30 @@ export function generateJsonSchema(node: SchemaNode): any {
     for (const [key, value] of Object.entries(node.properties)) {
       schema.properties[key] = generateJsonSchema(value);
     }
+  }
 
+  // Collect required fields from both properties and patternProperties
+  if (node.type === 'object') {
+    const requiredFields: Set<string> = new Set();
+    
+    // Add required from properties (node.required)
     if (node.required && node.required.length > 0) {
-      schema.required = node.required;
+      node.required.forEach(key => requiredFields.add(key));
+    }
+    
+    // Add required from patternProperties container
+    const patternPropertiesContainer = node._containers?.find(c => c._nodeKind === 'patternProperties');
+    if (patternPropertiesContainer?.requiredRaw) {
+      const values = patternPropertiesContainer.requiredRaw
+        .split(',')
+        .map((v) => v.trim())
+        .filter((v) => v);
+      values.forEach(key => requiredFields.add(key));
+    }
+    
+    // Add the collected required fields to schema
+    if (requiredFields.size > 0) {
+      schema.required = Array.from(requiredFields);
     }
   }
 
