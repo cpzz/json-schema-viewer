@@ -18,6 +18,12 @@ code {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
+/* 保留输入框内的文本选择/编辑能力（面板整体禁用了选择） */
+input,
+textarea {
+  user-select: text;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

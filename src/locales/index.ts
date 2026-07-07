@@ -2,13 +2,28 @@ export const translations = {
   en: {
     // Toolbar
     new: 'New',
+    newFile: 'New File',
     open: 'Open',
+    openFile: 'Open File',
+    openDirectory: 'Open Folder',
+    untitledFile: 'untitled.json',
     save: 'Save',
     refresh: 'Refresh',
     validate: 'Validate',
     refManager: 'Reference Manager',
     unsaved: '● Unsaved',
     saved: '✓ Saved',
+
+    // FileExplorer
+    fileExplorer: 'File Explorer',
+    toggleFileExplorer: 'Toggle File Explorer',
+    openFolder: 'Open Folder',
+    addFiles: 'Add Files',
+    removeFromList: 'Remove from list',
+    emptyExplorer: 'Open a folder or add files',
+    emptyDir: 'Empty',
+    loading: 'Loading...',
+    fileLoadFailed: 'Failed to load file:',
 
     // PropertyPanel
     propertyType: 'Property Type',
@@ -132,13 +147,28 @@ export const translations = {
   zh: {
     // Toolbar
     new: '新建',
+    newFile: '新建文件',
     open: '打开',
+    openFile: '打开文件',
+    openDirectory: '打开目录',
+    untitledFile: '未命名.json',
     save: '保存',
     refresh: '刷新',
     validate: '校验',
     refManager: '引用管理',
     unsaved: '● 未保存',
     saved: '✓ 已保存',
+
+    // FileExplorer
+    fileExplorer: '文件树',
+    toggleFileExplorer: '显示/隐藏文件树',
+    openFolder: '打开文件夹',
+    addFiles: '添加文件',
+    removeFromList: '从列表移除',
+    emptyExplorer: '打开文件夹或添加文件',
+    emptyDir: '空目录',
+    loading: '加载中...',
+    fileLoadFailed: '加载文件失败：',
 
     // PropertyPanel
     propertyType: '属性类型',

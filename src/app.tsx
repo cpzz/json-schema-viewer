@@ -4,22 +4,34 @@ import { TreeEditor } from '@/components/TreeEditor';
 import { PropertyPanel } from '@/components/PropertyPanel';
 import { CodePanel } from '@/components/CodePanel';
 import { RefManager } from '@/components/RefManager';
+import { FileExplorer } from '@/components/FileExplorer';
 import { ResizableDivider } from '@/components/ResizableDivider';
 import { useSchemaStore } from '@/stores/schemaStore';
 import { useEditorStore } from '@/stores/editorStore';
 import { useTheme } from '@/stores/themeStore';
 import { useI18n } from '@/stores/languageStore';
 import { useLayoutStore } from '@/stores/layoutStore';
+import { useFileExplorerStore } from '@/stores/fileExplorerStore';
+import { useSchemaFile } from '@/hooks/useSchemaFile';
 import { generateJsonSchemaWithLineMap } from '@/utils/schemaGenerator';
 import { Copy, Check } from 'lucide-react';
 
 function App() {
-  const { rootSchema, setRootSchema, createNode } = useSchemaStore();
-  const { isDirty, markDirty } = useEditorStore();
+  const { rootSchema } = useSchemaStore();
+  const { isDirty } = useEditorStore();
   const { theme } = useTheme();
   const { t } = useI18n();
-  const { treeEditorWidth, propertyPanelWidth, setTreeEditorWidth, setPropertyPanelWidth } =
-    useLayoutStore();
+  const {
+    treeEditorWidth,
+    propertyPanelWidth,
+    fileExplorerWidth,
+    showFileExplorer,
+    setTreeEditorWidth,
+    setPropertyPanelWidth,
+    setFileExplorerWidth,
+  } = useLayoutStore();
+  const { hydrate } = useFileExplorerStore();
+  const { openFile } = useSchemaFile();
   const [copied, setCopied] = useState(false);
   const lineMapRef = useRef<Map<string, number>>(new Map());
 
@@ -44,12 +56,17 @@ function App() {
     }
   }, [theme]);
 
-  const handleAddRootNode = () => {
-    const node = createNode('object', 'root');
-    setRootSchema(node);
-    useEditorStore.getState().toggleExpand(node.id);
-    markDirty();
-  };
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  const handleResizeExplorer = useCallback(
+    (deltaX: number) => {
+      const newWidth = Math.max(150, fileExplorerWidth + deltaX);
+      setFileExplorerWidth(newWidth);
+    },
+    [fileExplorerWidth, setFileExplorerWidth]
+  );
 
   const handleResizeLeft = useCallback(
     (deltaX: number) => {
@@ -72,18 +89,31 @@ function App() {
       <Toolbar />
 
       <div className="flex-1 flex overflow-hidden">
+        {/* File Explorer */}
+        {showFileExplorer && (
+          <>
+            <div
+              style={{ width: `${fileExplorerWidth}px` }}
+              className="shrink-0 select-none border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-900"
+            >
+              <FileExplorer onOpenFile={openFile} />
+            </div>
+            <ResizableDivider onResize={handleResizeExplorer} />
+          </>
+        )}
+
         {/* Tree Editor */}
-        <div style={{ width: `${treeEditorWidth}px` }} className="border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-900">
+        <div style={{ width: `${treeEditorWidth}px` }} className="shrink-0 select-none border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-900">
           <div className="h-10 border-b border-gray-200 dark:border-gray-700 flex items-center px-4">
             <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{t('treeEditor')}</span>
           </div>
-          <TreeEditor schema={rootSchema} onAddRootNode={handleAddRootNode} />
+          <TreeEditor schema={rootSchema} />
         </div>
 
         <ResizableDivider onResize={handleResizeLeft} />
 
         {/* Property Panel */}
-        <div style={{ width: `${propertyPanelWidth}px` }} className="border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-900">
+        <div style={{ width: `${propertyPanelWidth}px` }} className="shrink-0 select-none border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-900">
           <div className="h-10 border-b border-gray-200 dark:border-gray-700 flex items-center px-4">
             <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{t('propertyPanel')}</span>
           </div>
@@ -93,7 +123,7 @@ function App() {
         <ResizableDivider onResize={handleResizeRight} />
 
         {/* Code Panel */}
-        <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-950">
+        <div className="flex-1 min-w-0 flex flex-col bg-gray-50 dark:bg-gray-950">
           <div className="h-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 gap-2">
             <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{t('codeTitle')}</span>
             <div className="flex-1" />

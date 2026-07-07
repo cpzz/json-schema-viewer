@@ -1,5 +1,6 @@
 import {
   FilePlus,
+  FileInput,
   FolderOpen,
   Save,
   RefreshCw,
@@ -8,51 +9,41 @@ import {
   Globe,
   Moon,
   Sun,
+  PanelLeft,
 } from 'lucide-react';
 import { useSchemaStore } from '@/stores/schemaStore';
 import { useEditorStore } from '@/stores/editorStore';
 import { useUIStore } from '@/stores/uiStore';
+import { useLayoutStore } from '@/stores/layoutStore';
+import { useFileExplorerStore } from '@/stores/fileExplorerStore';
+import { useSchemaFile } from '@/hooks/useSchemaFile';
 import { useI18n } from '@/stores/languageStore';
 import { useTheme } from '@/stores/themeStore';
-import { importSchema, saveSchema, refreshSchema } from '@/services/importExportService';
+import { saveSchema, refreshSchema, getActiveWebFileHandle } from '@/services/importExportService';
 import { validateSchema } from '@/services/validationService';
 
 export function Toolbar() {
   const { rootSchema, setRootSchema } = useSchemaStore();
   const { isDirty, filePath, markClean, setFilePath } = useEditorStore();
   const { toggleRefManager } = useUIStore();
+  const { showFileExplorer, toggleFileExplorer } = useLayoutStore();
+  const { promoteUnsavedToFile } = useFileExplorerStore();
+  const { newFile, openFileDialog, openDirectory } = useSchemaFile();
   const { t, language, setLanguage } = useI18n();
   const { theme, toggleTheme } = useTheme();
 
-  const handleNew = () => {
-    if (isDirty && !confirm(t('unsavedChanges'))) {
-      return;
-    }
-    const emptySchema = useSchemaStore.getState().createNode('object');
-    setRootSchema(emptySchema);
-    setFilePath(null);
-    markClean();
-  };
-
-  const handleOpen = async () => {
-    try {
-      const result = await importSchema();
-      if (result) {
-        setRootSchema(result.schema);
-        setFilePath(result.filePath);
-        markClean();
-      }
-    } catch (error) {
-      alert(t('fileOpenFailed') + ' ' + (error as Error).message);
-    }
-  };
-
   const handleSave = async () => {
     if (!rootSchema) return;
+    const wasNew = !filePath;
     const newFilePath = await saveSchema(filePath, rootSchema);
     if (newFilePath) {
       setFilePath(newFilePath);
       markClean();
+      if (wasNew) {
+        const name =
+          newFilePath.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || newFilePath;
+        promoteUnsavedToFile({ path: newFilePath, name, handle: getActiveWebFileHandle() });
+      }
     }
   };
 
@@ -85,16 +76,37 @@ export function Toolbar() {
   return (
     <div className="h-12 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 gap-2">
       <button
-        onClick={handleNew}
+        onClick={toggleFileExplorer}
+        className={`p-2 rounded transition-colors ${
+          showFileExplorer
+            ? 'bg-gray-100 dark:bg-gray-800 text-blue-600 dark:text-blue-400'
+            : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+        }`}
+        title={t('toggleFileExplorer')}
+      >
+        <PanelLeft size={18} />
+      </button>
+
+      <div className="w-px h-6 bg-gray-300 dark:bg-gray-700 mx-2" />
+
+      <button
+        onClick={newFile}
         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-        title={t('new')}
+        title={t('newFile')}
       >
         <FilePlus size={18} />
       </button>
       <button
-        onClick={handleOpen}
+        onClick={openFileDialog}
         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-        title={t('open')}
+        title={t('openFile')}
+      >
+        <FileInput size={18} />
+      </button>
+      <button
+        onClick={openDirectory}
+        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+        title={t('openDirectory')}
       >
         <FolderOpen size={18} />
       </button>

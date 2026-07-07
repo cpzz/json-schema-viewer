@@ -360,22 +360,15 @@ function TreeNode({ node, level, parentObject, propertyKey }: TreeNodeProps) {
 
 interface TreeEditorProps {
   schema: SchemaNode | null;
-  onAddRootNode: () => void;
 }
 
-export function TreeEditor({ schema, onAddRootNode }: TreeEditorProps) {
+export function TreeEditor({ schema }: TreeEditorProps) {
   const { t } = useI18n();
   if (!schema) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500 bg-white dark:bg-gray-900">
         <div className="text-center">
-          <p className="mb-4">{t('noSchema')}</p>
-          <button
-            onClick={onAddRootNode}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            {t('createRootNode')}
-          </button>
+          <p>{t('noSchema')}</p>
         </div>
       </div>
     );

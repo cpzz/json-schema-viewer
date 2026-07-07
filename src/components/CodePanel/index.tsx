@@ -72,6 +72,7 @@ export function CodePanel({ schema, jsonContent, lineMapRef }: CodePanelProps) {
           }}
           options={{
             readOnly: true,
+            automaticLayout: true,
             minimap: { enabled: false },
             lineNumbers: 'on',
             folding: true,

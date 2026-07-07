@@ -4,6 +4,10 @@ export interface ElectronAPI {
     save: (filePath: string, content: string) => Promise<boolean>;
     saveAs: (content: string) => Promise<{ path: string } | null>;
     read: (filePath: string) => Promise<string | null>;
+    openDirectory: () => Promise<string | null>;
+    readDirectory: (
+      dirPath: string
+    ) => Promise<Array<{ name: string; path: string; type: 'file' | 'directory' }>>;
   };
   window: {
     minimize: () => Promise<void>;

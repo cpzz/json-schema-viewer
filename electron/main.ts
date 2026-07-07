@@ -98,6 +98,42 @@ ipcMain.handle('file:read', async (_event, filePath) => {
   }
 });
 
+ipcMain.handle('dialog:openDirectory', async () => {
+  if (!mainWindow) return null;
+
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  return result.filePaths[0];
+});
+
+ipcMain.handle('fs:readDirectory', async (_event, dirPath) => {
+  try {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    return entries
+      .filter(
+        (entry) => entry.isDirectory() || (entry.isFile() && /\.json$/i.test(entry.name))
+      )
+      .map((entry) => ({
+        name: entry.name,
+        path: path.join(dirPath, entry.name),
+        type: entry.isDirectory() ? 'directory' : 'file',
+      }))
+      .sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+  } catch (error) {
+    console.error('Failed to read directory:', error);
+    return [];
+  }
+});
+
 ipcMain.handle('window:minimize', () => {
   mainWindow?.minimize();
 });

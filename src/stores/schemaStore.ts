@@ -113,6 +113,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     };
 
     set({ rootSchema: updateNodeRecursive(rootSchema) });
+    useEditorStore.getState().markDirty();
   },
 
   addNode: (parentId, node) => {
@@ -120,6 +121,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
 
     if (!parentId) {
       set({ rootSchema: node });
+      useEditorStore.getState().markDirty();
       useEditorStore.getState().selectNode(node.id);
       return;
     }
@@ -308,6 +310,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     };
 
     set({ rootSchema: addNodeRecursive(rootSchema) });
+    useEditorStore.getState().markDirty();
     const editorStore = useEditorStore.getState();
     // Expand the target object node so the new node is visible
     if (!editorStore.expandedNodes.has(actualParentId)) {
@@ -409,6 +412,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
 
     const nextRootSchema = addArrayContainerRecursive(rootSchema);
     set({ rootSchema: nextRootSchema });
+    useEditorStore.getState().markDirty();
 
     const editorStore = useEditorStore.getState();
     if (!editorStore.expandedNodes.has(arrayNodeId)) {
@@ -428,6 +432,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     const { rootSchema } = get();
     if (!rootSchema || rootSchema.id === nodeId) {
       set({ rootSchema: null });
+      useEditorStore.getState().markDirty();
       useEditorStore.getState().selectNode(null);
       return;
     }
@@ -619,6 +624,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     };
 
     set({ rootSchema: removeNodeRecursive(rootSchema) });
+    useEditorStore.getState().markDirty();
     if (parentId) {
       useEditorStore.getState().selectNode(parentId);
     }
@@ -725,6 +731,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     };
 
     set({ rootSchema: renameKeyRecursive(rootSchema) });
+    useEditorStore.getState().markDirty();
   },
 
   setRequired: (parentId, propertyKey, required) => {
@@ -748,11 +755,13 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
   addDefinition: (name, schema) => {
     const { definitions } = get();
     set({ definitions: { ...definitions, [name]: schema } });
+    useEditorStore.getState().markDirty();
   },
 
   updateDefinition: (name, schema) => {
     const { definitions } = get();
     set({ definitions: { ...definitions, [name]: schema } });
+    useEditorStore.getState().markDirty();
   },
 
   removeDefinition: (name) => {
@@ -760,6 +769,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     const newDefinitions = { ...definitions };
     delete newDefinitions[name];
     set({ definitions: newDefinitions });
+    useEditorStore.getState().markDirty();
   },
 
   createRef: (definitionName) => {
@@ -908,5 +918,6 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
     };
 
     set({ rootSchema: convertRecursive(rootSchema) });
+    useEditorStore.getState().markDirty();
   },
 }));

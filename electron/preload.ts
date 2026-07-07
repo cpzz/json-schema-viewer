@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('file:save', { filePath, content }),
     saveAs: (content: string) => ipcRenderer.invoke('file:saveAs', content),
     read: (filePath: string) => ipcRenderer.invoke('file:read', filePath),
+    openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
+    readDirectory: (dirPath: string) => ipcRenderer.invoke('fs:readDirectory', dirPath),
   },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),

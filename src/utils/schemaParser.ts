@@ -66,7 +66,6 @@ function parseNode(node: any, parentId?: string, order: number = 0): SchemaNode 
       let childOrder = 0;
       for (const [key, value] of Object.entries(node.properties)) {
         const childNode = parseNode(value, schemaNode.id, childOrder++);
-        childNode.title = key;
         schemaNode.properties[key] = childNode;
       }
 
@@ -90,7 +89,6 @@ function parseNode(node: any, parentId?: string, order: number = 0): SchemaNode 
       let childOrder = 0;
       for (const [pattern, value] of Object.entries(node.patternProperties)) {
         const childNode = parseNode(value, schemaNode.id, childOrder++);
-        childNode.title = pattern;
         schemaNode.patternProperties![pattern] = childNode;
       }
     } else {
@@ -149,7 +147,6 @@ function parseNode(node: any, parentId?: string, order: number = 0): SchemaNode 
       schemaNode.dependentSchemas = {};
       for (const [key, value] of Object.entries(node.dependentSchemas)) {
         const childNode = parseNode(value, schemaNode.id, 0);
-        childNode.title = key;
         schemaNode.dependentSchemas[key] = childNode;
       }
     }
