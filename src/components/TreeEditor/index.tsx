@@ -198,9 +198,11 @@ function TreeNode({ node, level, parentObject, propertyKey }: TreeNodeProps) {
   if (isContainer) {
     children = getContainerChildren(node, parentObject);
   } else {
-    if (node._containers) {
-      children = node._containers;
+    // 如果节点有 _containers（array 类型），只显示容器，不显示原始字段
+    if (node._containers !== undefined) {
+      children = node._containers || [];
     } else {
+      // 没有 _containers 时才显示原始字段
       if (node.items) {
         children = [node.items];
       }

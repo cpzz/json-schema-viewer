@@ -187,9 +187,12 @@ export function generateJsonSchemaWithLineMap(
   // 标记根节点
   lineMap.set(node.id, 1);
   
+  // 预先分割 JSON 字符串，避免在递归中重复分割
+  const lines = json.split('\n');
+  
   // 递归标记所有节点
   const markNodeLines = (schemaNode: SchemaNode, jsonObj: any, currentLine: number) => {
-    const lines = json.split('\n');
+    const startTime = performance.now();
     
     // 为 properties 容器节点标记行号
     if (schemaNode._containers?.some(c => c._nodeKind === 'properties')) {
@@ -333,9 +336,21 @@ export function generateJsonSchemaWithLineMap(
         }
       }
     }
+    
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    if (duration > 10) {
+      console.log(`[markNodeLines] Node: ${schemaNode.id}, Type: ${schemaNode.type}, Duration: ${duration.toFixed(2)}ms`);
+    }
   };
   
+  const totalStartTime = performance.now();
   markNodeLines(node, schema, 0);
+  const totalEndTime = performance.now();
+  const totalDuration = totalEndTime - totalStartTime;
+  if (totalDuration > 10) {
+    console.log(`[generateJsonSchemaWithLineMap] Total duration: ${totalDuration.toFixed(2)}ms`);
+  }
   
   return { json, lineMap };
 }

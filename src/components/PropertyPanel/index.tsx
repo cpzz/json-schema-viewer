@@ -452,10 +452,26 @@ export function PropertyPanel() {
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('minLength')}</label>
                   <input
                     type="number"
-                    value={selectedNode.minLength || ''}
-                    onChange={(e) =>
-                      handleUpdate({ minLength: Number(e.target.value) || undefined })
-                    }
+                    min="0"
+                    max={selectedNode.maxLength ?? ''}
+                    value={selectedNode.minLength ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        handleUpdate({ minLength: undefined });
+                        return;
+                      }
+                      const numValue = Number(value);
+                      if (numValue < 0) {
+                        handleUpdate({ minLength: 0 });
+                        return;
+                      }
+                      if (selectedNode.maxLength !== undefined && numValue > selectedNode.maxLength) {
+                        handleUpdate({ minLength: selectedNode.maxLength });
+                        return;
+                      }
+                      handleUpdate({ minLength: numValue });
+                    }}
                     className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -463,10 +479,25 @@ export function PropertyPanel() {
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('maxLength')}</label>
                   <input
                     type="number"
-                    value={selectedNode.maxLength || ''}
-                    onChange={(e) =>
-                      handleUpdate({ maxLength: Number(e.target.value) || undefined })
-                    }
+                    min={selectedNode.minLength ?? 0}
+                    value={selectedNode.maxLength ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        handleUpdate({ maxLength: undefined });
+                        return;
+                      }
+                      const numValue = Number(value);
+                      if (numValue < 0) {
+                        handleUpdate({ maxLength: 0 });
+                        return;
+                      }
+                      if (selectedNode.minLength !== undefined && numValue < selectedNode.minLength) {
+                        handleUpdate({ maxLength: selectedNode.minLength });
+                        return;
+                      }
+                      handleUpdate({ maxLength: numValue });
+                    }}
                     className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -577,10 +608,25 @@ export function PropertyPanel() {
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('minItems') || 'Min Items'}</label>
                   <input
                     type="number"
+                    min="0"
+                    max={selectedNode.maxItems ?? ''}
                     value={selectedNode.minItems ?? ''}
                     onChange={(e) => {
                       const value = e.target.value;
-                      handleUpdate({ minItems: value === '' ? undefined : Number(value) });
+                      if (value === '') {
+                        handleUpdate({ minItems: undefined });
+                        return;
+                      }
+                      const numValue = Number(value);
+                      if (numValue < 0) {
+                        handleUpdate({ minItems: 0 });
+                        return;
+                      }
+                      if (selectedNode.maxItems !== undefined && numValue > selectedNode.maxItems) {
+                        handleUpdate({ minItems: selectedNode.maxItems });
+                        return;
+                      }
+                      handleUpdate({ minItems: numValue });
                     }}
                     className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -590,10 +636,24 @@ export function PropertyPanel() {
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('maxItems') || 'Max Items'}</label>
                   <input
                     type="number"
+                    min={selectedNode.minItems ?? 0}
                     value={selectedNode.maxItems ?? ''}
                     onChange={(e) => {
                       const value = e.target.value;
-                      handleUpdate({ maxItems: value === '' ? undefined : Number(value) });
+                      if (value === '') {
+                        handleUpdate({ maxItems: undefined });
+                        return;
+                      }
+                      const numValue = Number(value);
+                      if (numValue < 0) {
+                        handleUpdate({ maxItems: 0 });
+                        return;
+                      }
+                      if (selectedNode.minItems !== undefined && numValue < selectedNode.minItems) {
+                        handleUpdate({ maxItems: selectedNode.minItems });
+                        return;
+                      }
+                      handleUpdate({ maxItems: numValue });
                     }}
                     className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />

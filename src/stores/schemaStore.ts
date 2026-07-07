@@ -550,19 +550,25 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         result = { ...result, dependentSchemas: newDependentSchemas };
       }
 
+      // 记录是否删除了数组容器
+      let deletedArrayContainerKind: string | null | undefined = null;
+
       if (node._containers) {
+        // 先找到被删除的容器（在过滤之前）
+        const deletedContainer = node._containers.find(c => c.id === nodeId);
+        
         const newContainers = node._containers
           .filter(c => c.id !== nodeId)
           .map(c => removeNodeRecursive(c));
         
         result = {
           ...result,
-          _containers: newContainers,
+          _containers: newContainers.length > 0 ? newContainers : undefined,
         };
 
         // When an applicator container is deleted, also clear the corresponding field
-        const deletedContainer = node._containers.find(c => c.id === nodeId);
         if (deletedContainer) {
+          deletedArrayContainerKind = deletedContainer._nodeKind;
           if (deletedContainer._nodeKind === 'properties') {
             result = { ...result, properties: undefined, required: undefined };
           } else if (deletedContainer._nodeKind === 'patternProperties') {
@@ -583,7 +589,8 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         }
       }
 
-      if (node.items) {
+      // 只有在没有删除对应容器的情况下才处理这些字段
+      if (node.items && deletedArrayContainerKind !== 'items') {
         if (node.items.id === nodeId) {
           result = { ...result, items: undefined };
         } else {
@@ -591,7 +598,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         }
       }
 
-      if (node.prefixItems) {
+      if (node.prefixItems && deletedArrayContainerKind !== 'prefixItems') {
         result = {
           ...result,
           prefixItems: node.prefixItems
@@ -600,7 +607,7 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         };
       }
 
-      if (node.contains) {
+      if (node.contains && deletedArrayContainerKind !== 'contains') {
         if (node.contains.id === nodeId) {
           result = { ...result, contains: undefined };
         } else {

@@ -171,7 +171,24 @@ export function NodeMenu({ nodeId, nodeType, nodeKind, anchorRef, onClose }: Nod
   const rootSchema = useSchemaStore.getState().rootSchema;
   const currentNode = rootSchema ? findNodeById(rootSchema, nodeId) : null;
   const parentNode = currentNode?._parentId && rootSchema ? findNodeById(rootSchema, currentNode._parentId) : null;
-  const canAddChildrenInItemsContainer = nodeKind !== 'items' || parentNode?.items !== false;
+  
+  // 检查是否可以添加子节点
+  let canAddChildren = true;
+  if (nodeKind === 'items' || nodeKind === 'contains') {
+    // items/contains 容器只能有一个子节点
+    if (nodeKind === 'items') {
+      canAddChildren = !parentNode?.items;
+    } else if (nodeKind === 'contains') {
+      canAddChildren = !parentNode?.contains;
+    }
+  } else if (nodeKind === 'additionalProperties' || nodeKind === 'propertyNames') {
+    // additionalProperties/propertyNames 也只能有一个子节点
+    if (nodeKind === 'additionalProperties') {
+      canAddChildren = !parentNode?.additionalProperties;
+    } else if (nodeKind === 'propertyNames') {
+      canAddChildren = !parentNode?.propertyNames;
+    }
+  }
 
   return (
     <div
@@ -179,12 +196,12 @@ export function NodeMenu({ nodeId, nodeType, nodeKind, anchorRef, onClose }: Nod
       className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[160px]"
     >
       {/* 应用器节点：添加子节点 */}
-      {isApplicatorNode && (
+      {isApplicatorNode && canAddChildren && (
         <>
           <div className="px-3 py-1 text-xs text-gray-400 dark:text-gray-500 font-medium">
             {APPLICATOR_MENU_LABELS[nodeKind!] || t('addNode')}
           </div>
-          {canAddChildrenInItemsContainer && ADD_ITEMS.map(({ type, label, icon: Icon }) => (
+          {ADD_ITEMS.map(({ type, label, icon: Icon }) => (
             <button
               key={type}
               onClick={() => handleAddChild(type)}
