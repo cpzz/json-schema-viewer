@@ -75,6 +75,7 @@ function parseNode(node: any, parentId?: string, order: number = 0): SchemaNode 
     }
 
     // patternProperties 容器
+    schemaNode.patternProperties = {};
     if (node.patternProperties && Object.keys(node.patternProperties).length > 0) {
       const patternContainer: SchemaNode = {
         id: createNodeId(),
@@ -89,10 +90,8 @@ function parseNode(node: any, parentId?: string, order: number = 0): SchemaNode 
       let childOrder = 0;
       for (const [pattern, value] of Object.entries(node.patternProperties)) {
         const childNode = parseNode(value, schemaNode.id, childOrder++);
-        schemaNode.patternProperties![pattern] = childNode;
+        schemaNode.patternProperties[pattern] = childNode;
       }
-    } else {
-      schemaNode.patternProperties = {};
     }
 
     // additionalProperties 容器
@@ -214,14 +213,48 @@ function parseNode(node: any, parentId?: string, order: number = 0): SchemaNode 
     }
   }
 
+  // 组合关键字（allOf/anyOf/oneOf/not）对任意类型均合法，作为容器追加
+  const compositionContainers: SchemaNode[] = [];
+  let compositionOrder = schemaNode._containers?.length || 0;
+
+  for (const key of ['allOf', 'anyOf', 'oneOf'] as const) {
+    const arr = node[key];
+    if (Array.isArray(arr)) {
+      compositionContainers.push({
+        id: createNodeId(),
+        type: 'object',
+        title: key,
+        _nodeKind: key,
+        _order: compositionOrder++,
+        _parentId: schemaNode.id,
+      });
+      schemaNode[key] = arr.map((item: any, idx: number) => parseNode(item, schemaNode.id, idx));
+    }
+  }
+
+  if (node.not && typeof node.not === 'object' && !Array.isArray(node.not)) {
+    compositionContainers.push({
+      id: createNodeId(),
+      type: 'object',
+      title: 'not',
+      _nodeKind: 'not',
+      _order: compositionOrder++,
+      _parentId: schemaNode.id,
+    });
+    schemaNode.not = parseNode(node.not, schemaNode.id, 0);
+  }
+
+  if (compositionContainers.length > 0) {
+    schemaNode._containers = [...(schemaNode._containers || []), ...compositionContainers];
+  }
+
   return schemaNode;
 }
 
-function inferType(node: any): SchemaType {
+function inferType(node: any): SchemaType | undefined {
   if (node.type) {
     return node.type as SchemaType;
   }
-  if (node.properties) return 'object';
   if (node.items || node.prefixItems || node.contains) return 'array';
-  return 'object';
+  return undefined;
 }

@@ -14,11 +14,11 @@ import { useLayoutStore } from '@/stores/layoutStore';
 import { useFileExplorerStore } from '@/stores/fileExplorerStore';
 import { useSchemaFile } from '@/hooks/useSchemaFile';
 import { generateJsonSchemaWithLineMap } from '@/utils/schemaGenerator';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, ListChevronsDownUp, ListChevronsUpDown } from 'lucide-react';
 
 function App() {
   const { rootSchema } = useSchemaStore();
-  const { isDirty } = useEditorStore();
+  const { isDirty, expandedNodes, expandAll, collapseAll } = useEditorStore();
   const { theme } = useTheme();
   const { t } = useI18n();
   const {
@@ -105,7 +105,18 @@ function App() {
         {/* Tree Editor */}
         <div style={{ width: `${treeEditorWidth}px` }} className="shrink-0 select-none border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-900">
           <div className="h-10 border-b border-gray-200 dark:border-gray-700 flex items-center px-4">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{t('treeEditor')}</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100 flex-1">{t('treeEditor')}</span>
+            {rootSchema && (
+              <button
+                onClick={() => expandedNodes.size > 0 ? collapseAll() : expandAll(rootSchema)}
+                title={expandedNodes.size > 0 ? t('collapseAll') : t('expandAll')}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
+              >
+                {expandedNodes.size > 0
+                  ? <ListChevronsDownUp size={16} />
+                  : <ListChevronsUpDown size={16} />}
+              </button>
+            )}
           </div>
           <TreeEditor schema={rootSchema} />
         </div>

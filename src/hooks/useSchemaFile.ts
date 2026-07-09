@@ -16,7 +16,7 @@ import { FileTreeItem } from '@/types/fileTree';
 /** 统一的 schema 文件操作：新建 / 打开文件 / 打开目录 / 从文件树打开 */
 export function useSchemaFile() {
   const { setRootSchema } = useSchemaStore();
-  const { isDirty, markClean, markDirty, setFilePath } = useEditorStore();
+  const { isDirty, markClean, markDirty, setFilePath, collapseAll } = useEditorStore();
   const { addRoots, addUnsavedFile, setSelectedPath } = useFileExplorerStore();
   const { t } = useI18n();
 
@@ -31,13 +31,14 @@ export function useSchemaFile() {
       const content = await readFileContent(item);
       const json = JSON.parse(content);
       const schema = parseJsonSchema(json);
+      collapseAll();
       setRootSchema(schema);
       setFilePath(item.path);
       setActiveWebFileHandle(getFileHandle(item));
       setSelectedPath(item.path);
       markClean();
     },
-    [setRootSchema, setFilePath, setSelectedPath, markClean]
+    [setRootSchema, setFilePath, setSelectedPath, markClean, collapseAll]
   );
 
   // 从文件树点击文件时调用

@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { SchemaNode } from '@/types/schema';
 import { EditorState } from '@/types/editor';
+import { getAllNodeIds } from '@/utils/treeUtils';
 
 interface EditorStore extends EditorState {
   selectNode: (nodeId: string | null) => void;
   toggleExpand: (nodeId: string) => void;
-  expandAll: () => void;
+  expandAll: (root: SchemaNode) => void;
   collapseAll: () => void;
   copyNode: (node: SchemaNode) => void;
   pasteNode: (parentId: string) => void;
@@ -39,8 +40,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set({ expandedNodes: newExpanded });
   },
 
-  expandAll: () => {
-    console.log('Expand all nodes');
+  expandAll: (root: SchemaNode) => {
+    const ids = getAllNodeIds(root);
+    set({ expandedNodes: new Set(ids) });
   },
 
   collapseAll: () => {

@@ -14,6 +14,9 @@ import {
   Ban,
   Key,
   GitBranch,
+  Layers,
+  Shuffle,
+  GitFork,
 } from 'lucide-react';
 import { SchemaNode, SchemaType } from '@/types/schema';
 import { useEditorStore } from '@/stores/editorStore';
@@ -27,7 +30,7 @@ interface TreeNodeProps {
   propertyKey?: string;
 }
 
-function getTypeIcon(type: SchemaType) {
+function getTypeIcon(type?: SchemaType) {
   switch (type) {
     case 'string':
       return <Type size={14} className="text-green-600" />;
@@ -66,6 +69,14 @@ function getContainerIcon(kind?: string) {
       return <List size={14} className="text-rose-500" />;
     case 'contains':
       return <List size={14} className="text-fuchsia-500" />;
+    case 'allOf':
+      return <Layers size={14} className="text-indigo-500" />;
+    case 'anyOf':
+      return <Shuffle size={14} className="text-cyan-500" />;
+    case 'oneOf':
+      return <GitFork size={14} className="text-emerald-500" />;
+    case 'not':
+      return <Ban size={14} className="text-red-500" />;
     default:
       return <FolderOpen size={14} className="text-gray-500" />;
   }
@@ -106,6 +117,14 @@ function getContainerChildren(node: SchemaNode, parentObject?: SchemaNode): Sche
       }
       return [];
     }
+    case 'allOf':
+      return parentObject.allOf || [];
+    case 'anyOf':
+      return parentObject.anyOf || [];
+    case 'oneOf':
+      return parentObject.oneOf || [];
+    case 'not':
+      return parentObject.not ? [parentObject.not] : [];
     default:
       return [];
   }
@@ -157,6 +176,14 @@ function getContainerChildrenWithKeys(
       }
       return [];
     }
+    case 'allOf':
+      return (parentObject.allOf || []).map((child) => ['', child]);
+    case 'anyOf':
+      return (parentObject.anyOf || []).map((child) => ['', child]);
+    case 'oneOf':
+      return (parentObject.oneOf || []).map((child) => ['', child]);
+    case 'not':
+      return parentObject.not ? [['not', parentObject.not]] : [];
     default:
       return [];
   }
@@ -295,7 +322,7 @@ function TreeNode({ node, level, parentObject, propertyKey }: TreeNodeProps) {
           {node.title || propertyKey || t('unnamed')}
         </span>
         {!isContainer && (
-          <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 shrink-0">({node.type})</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 shrink-0">({node.type || 'any'})</span>
         )}
         {renderAdditionalValue()}
 
@@ -364,6 +391,7 @@ interface TreeEditorProps {
 
 export function TreeEditor({ schema }: TreeEditorProps) {
   const { t } = useI18n();
+
   if (!schema) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500 bg-white dark:bg-gray-900">

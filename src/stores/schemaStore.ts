@@ -21,9 +21,8 @@ interface SchemaStore {
   removeDefinition: (name: string) => void;
   createRef: (definitionName: string) => string;
 
-  createNode: (type: SchemaType, name?: string) => SchemaNode;
-  convertContainerNode: (containerId: string, newKind: string) => void;
-}
+  createNode: (type?: SchemaType, name?: string) => SchemaNode;
+  convertContainerNode: (containerId: string, newKind: string) => void;}
 
 let nodeIdCounter = 0;
 
@@ -107,6 +106,19 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
 
       if (node.contains) {
         result = { ...result, contains: updateNodeRecursive(node.contains) };
+      }
+
+      if (node.allOf) {
+        result = { ...result, allOf: node.allOf.map((item) => updateNodeRecursive(item)) };
+      }
+      if (node.anyOf) {
+        result = { ...result, anyOf: node.anyOf.map((item) => updateNodeRecursive(item)) };
+      }
+      if (node.oneOf) {
+        result = { ...result, oneOf: node.oneOf.map((item) => updateNodeRecursive(item)) };
+      }
+      if (node.not) {
+        result = { ...result, not: updateNodeRecursive(node.not) };
       }
 
       return result;
@@ -223,8 +235,45 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
           };
         }
 
-        // 直接向 object 节点添加子节点（原有的逻辑）
-        if (current.type === 'object') {
+        if (containerKind === 'allOf') {
+          return {
+            ...current,
+            allOf: [
+              ...(current.allOf || []),
+              { ...node, _parentId: current.id, _order: (current.allOf || []).length },
+            ],
+          };
+        }
+
+        if (containerKind === 'anyOf') {
+          return {
+            ...current,
+            anyOf: [
+              ...(current.anyOf || []),
+              { ...node, _parentId: current.id, _order: (current.anyOf || []).length },
+            ],
+          };
+        }
+
+        if (containerKind === 'oneOf') {
+          return {
+            ...current,
+            oneOf: [
+              ...(current.oneOf || []),
+              { ...node, _parentId: current.id, _order: (current.oneOf || []).length },
+            ],
+          };
+        }
+
+        if (containerKind === 'not') {
+          return {
+            ...current,
+            not: { ...node, _parentId: current.id, _order: 0 },
+          };
+        }
+
+        // 直接向 object / 无类型节点添加子节点（原有的逻辑）
+        if (current.type === 'object' || !current.type) {
           const nodeName = node.title || `property_${Date.now()}`;
           const isPattern = nodeName.includes('*') || nodeName.startsWith('^') || nodeName.includes('[');
 
@@ -304,6 +353,19 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
 
       if (current.contains) {
         result = { ...result, contains: addNodeRecursive(current.contains) };
+      }
+
+      if (current.allOf) {
+        result = { ...result, allOf: current.allOf.map((item) => addNodeRecursive(item)) };
+      }
+      if (current.anyOf) {
+        result = { ...result, anyOf: current.anyOf.map((item) => addNodeRecursive(item)) };
+      }
+      if (current.oneOf) {
+        result = { ...result, oneOf: current.oneOf.map((item) => addNodeRecursive(item)) };
+      }
+      if (current.not) {
+        result = { ...result, not: addNodeRecursive(current.not) };
       }
 
       return result;
@@ -486,6 +548,32 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
         const found = findParentId(node.contains, targetId);
         if (found) return found;
       }
+      if (node.allOf) {
+        for (const child of node.allOf) {
+          if (child.id === targetId) return node.id;
+          const found = findParentId(child, targetId);
+          if (found) return found;
+        }
+      }
+      if (node.anyOf) {
+        for (const child of node.anyOf) {
+          if (child.id === targetId) return node.id;
+          const found = findParentId(child, targetId);
+          if (found) return found;
+        }
+      }
+      if (node.oneOf) {
+        for (const child of node.oneOf) {
+          if (child.id === targetId) return node.id;
+          const found = findParentId(child, targetId);
+          if (found) return found;
+        }
+      }
+      if (node.not) {
+        if (node.not.id === targetId) return node.id;
+        const found = findParentId(node.not, targetId);
+        if (found) return found;
+      }
       if (node._containers) {
         for (const container of node._containers) {
           if (container.id === targetId) return node.id;
@@ -590,6 +678,14 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
             result = { ...result, prefixItems: undefined };
           } else if (deletedContainer._nodeKind === 'contains') {
             result = { ...result, contains: undefined, minContains: undefined, maxContains: undefined };
+          } else if (deletedContainer._nodeKind === 'allOf') {
+            result = { ...result, allOf: undefined };
+          } else if (deletedContainer._nodeKind === 'anyOf') {
+            result = { ...result, anyOf: undefined };
+          } else if (deletedContainer._nodeKind === 'oneOf') {
+            result = { ...result, oneOf: undefined };
+          } else if (deletedContainer._nodeKind === 'not') {
+            result = { ...result, not: undefined };
           }
         }
       }
@@ -617,6 +713,41 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
           result = { ...result, contains: undefined };
         } else {
           result = { ...result, contains: removeNodeRecursive(node.contains) };
+        }
+      }
+
+      if (node.allOf && deletedArrayContainerKind !== 'allOf') {
+        result = {
+          ...result,
+          allOf: node.allOf
+            .filter((item) => item.id !== nodeId)
+            .map((item, index) => ({ ...removeNodeRecursive(item), _order: index })),
+        };
+      }
+
+      if (node.anyOf && deletedArrayContainerKind !== 'anyOf') {
+        result = {
+          ...result,
+          anyOf: node.anyOf
+            .filter((item) => item.id !== nodeId)
+            .map((item, index) => ({ ...removeNodeRecursive(item), _order: index })),
+        };
+      }
+
+      if (node.oneOf && deletedArrayContainerKind !== 'oneOf') {
+        result = {
+          ...result,
+          oneOf: node.oneOf
+            .filter((item) => item.id !== nodeId)
+            .map((item, index) => ({ ...removeNodeRecursive(item), _order: index })),
+        };
+      }
+
+      if (node.not && deletedArrayContainerKind !== 'not') {
+        if (node.not.id === nodeId) {
+          result = { ...result, not: undefined };
+        } else {
+          result = { ...result, not: removeNodeRecursive(node.not) };
         }
       }
 

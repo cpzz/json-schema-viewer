@@ -10,11 +10,15 @@ export type NodeKind =
   | 'dependentSchemas'
   | 'items'
   | 'prefixItems'
-  | 'contains';
+  | 'contains'
+  | 'allOf'
+  | 'anyOf'
+  | 'oneOf'
+  | 'not';
 
 export interface SchemaNode {
   id: string;
-  type: SchemaType;
+  type?: SchemaType;
   title?: string;
   description?: string;
   $comment?: string;
@@ -30,6 +34,10 @@ export interface SchemaNode {
   items?: SchemaNode | false;
   prefixItems?: SchemaNode[];
   contains?: SchemaNode;
+  allOf?: SchemaNode[];
+  anyOf?: SchemaNode[];
+  oneOf?: SchemaNode[];
+  not?: SchemaNode;
   minItems?: number;
   maxItems?: number;
   uniqueItems?: boolean;

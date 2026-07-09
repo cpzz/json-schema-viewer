@@ -42,6 +42,24 @@ function forEachChild(
   if (node.contains) {
     fn(node.contains);
   }
+  if (node.allOf) {
+    for (const child of node.allOf) {
+      fn(child);
+    }
+  }
+  if (node.anyOf) {
+    for (const child of node.anyOf) {
+      fn(child);
+    }
+  }
+  if (node.oneOf) {
+    for (const child of node.oneOf) {
+      fn(child);
+    }
+  }
+  if (node.not) {
+    fn(node.not);
+  }
 }
 
 export function findNodeById(
@@ -131,6 +149,32 @@ export function getNodePath(
 
   if (root.contains) {
     const result = getNodePath(root.contains, nodeId, [...path, 'contains']);
+    if (result) return result;
+  }
+
+  if (root.allOf) {
+    for (let i = 0; i < root.allOf.length; i++) {
+      const result = getNodePath(root.allOf[i], nodeId, [...path, 'allOf', String(i)]);
+      if (result) return result;
+    }
+  }
+
+  if (root.anyOf) {
+    for (let i = 0; i < root.anyOf.length; i++) {
+      const result = getNodePath(root.anyOf[i], nodeId, [...path, 'anyOf', String(i)]);
+      if (result) return result;
+    }
+  }
+
+  if (root.oneOf) {
+    for (let i = 0; i < root.oneOf.length; i++) {
+      const result = getNodePath(root.oneOf[i], nodeId, [...path, 'oneOf', String(i)]);
+      if (result) return result;
+    }
+  }
+
+  if (root.not) {
+    const result = getNodePath(root.not, nodeId, [...path, 'not']);
     if (result) return result;
   }
 

@@ -19,7 +19,7 @@ import { findNodeById, findParentNode } from '@/utils/treeUtils';
 import { ClearableInput } from './ClearableInput';
 import { useI18n } from '@/stores/languageStore';
 
-function getTypeIcon(type: SchemaType) {
+function getTypeIcon(type?: SchemaType) {
   switch (type) {
     case 'string':
       return <Type size={14} className="text-green-600" />;
@@ -83,7 +83,6 @@ export function PropertyPanel() {
 
   const isRequired = isDirectProperty && (parentNode?.required || []).includes(propertyKey);
   const isContainsChild = parentNode?.type === 'array' && parentNode.contains?.id === selectedNodeId;
-  const isItemsContainer = selectedNode?._nodeKind === 'items';
 
   const isObjectNode = selectedNode?.type === 'object' && !selectedNode?._nodeKind;
 
@@ -181,11 +180,7 @@ export function PropertyPanel() {
           </div>
         )}
         
-        {(!isItemsContainer || (parentNode?.items !== false && parentNode?.items !== undefined)) && (
-          <div className="text-xs text-gray-400 dark:text-gray-500">
-            {t('addChildItem')}
-          </div>
-        )}
+
       </div>
     );
   }
@@ -201,7 +196,7 @@ export function PropertyPanel() {
     <div className="flex-1 overflow-auto p-4 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
       <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
         {t('propertyType')}: {getTypeIcon(selectedNode.type)}
-        {selectedNode.type}
+        {selectedNode.type || 'any'}
       </h3>
 
       <div className="space-y-4">
@@ -446,7 +441,7 @@ export function PropertyPanel() {
               <div className="border-t border-gray-200 dark:border-gray-700 mt-3 pt-3" />
             </div>
 
-            {selectedNode.type === 'string' && (
+            {(selectedNode.type === 'string' || !selectedNode.type) && (
               <>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('minLength')}</label>
@@ -541,7 +536,7 @@ export function PropertyPanel() {
               </>
             )}
 
-            {(selectedNode.type === 'number' || selectedNode.type === 'integer') && (
+            {(selectedNode.type === 'number' || selectedNode.type === 'integer' || !selectedNode.type) && (
               <>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('minimum')}</label>
@@ -602,7 +597,7 @@ export function PropertyPanel() {
               </>
             )}
 
-            {selectedNode.type === 'array' && (
+            {(selectedNode.type === 'array' || !selectedNode.type) && (
               <>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('minItems') || 'Min Items'}</label>

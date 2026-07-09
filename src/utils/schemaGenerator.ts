@@ -1,9 +1,11 @@
 import { SchemaNode } from '@/types/schema';
 
 export function generateJsonSchema(node: SchemaNode): any {
-  const schema: any = {
-    type: node.type,
-  };
+  const schema: any = {};
+
+  if (node.type) {
+    schema.type = node.type;
+  }
 
   if (!node._parentId) {
     schema.$schema = 'https://json-schema.org/draft/2020-12/schema';
@@ -66,7 +68,7 @@ export function generateJsonSchema(node: SchemaNode): any {
   if (node.pattern) schema.pattern = node.pattern;
   if (node.format) schema.format = node.format;
 
-  if (node.type === 'object' && node.properties) {
+  if ((node.type === 'object' || !node.type) && node.properties) {
     schema.properties = {};
     for (const [key, value] of Object.entries(node.properties)) {
       schema.properties[key] = generateJsonSchema(value);
@@ -74,7 +76,7 @@ export function generateJsonSchema(node: SchemaNode): any {
   }
 
   // Collect required fields from both properties and patternProperties
-  if (node.type === 'object') {
+  if (node.type === 'object' || !node.type) {
     const requiredFields: Set<string> = new Set();
     
     // Add required from properties (node.required)
@@ -98,7 +100,7 @@ export function generateJsonSchema(node: SchemaNode): any {
     }
   }
 
-  if (node.type === 'object' && node.patternProperties) {
+  if ((node.type === 'object' || !node.type) && node.patternProperties) {
     // Output patternProperties only if it has entries or if the applicator exists in _containers
     if (Object.keys(node.patternProperties).length > 0 || node._containers?.some(c => c._nodeKind === 'patternProperties')) {
       schema.patternProperties = {};
@@ -108,7 +110,7 @@ export function generateJsonSchema(node: SchemaNode): any {
     }
   }
 
-  if (node.type === 'object') {
+  if (node.type === 'object' || !node.type) {
     // Output additionalProperties only if the applicator exists in _containers
     if (node._containers?.some(c => c._nodeKind === 'additionalProperties')) {
       if (typeof node.additionalProperties === 'boolean') {
@@ -119,11 +121,11 @@ export function generateJsonSchema(node: SchemaNode): any {
     }
   }
 
-  if (node.type === 'object' && node.propertyNames) {
+  if ((node.type === 'object' || !node.type) && node.propertyNames) {
     schema.propertyNames = generateJsonSchema(node.propertyNames);
   }
 
-  if (node.type === 'object' && node.dependentSchemas) {
+  if ((node.type === 'object' || !node.type) && node.dependentSchemas) {
     // Output dependentSchemas only if the applicator exists in _containers
     if (node._containers?.some(c => c._nodeKind === 'dependentSchemas')) {
       schema.dependentSchemas = {};
@@ -155,6 +157,23 @@ export function generateJsonSchema(node: SchemaNode): any {
     } else if (hasContainsContainer) {
       schema.contains = {};
     }
+  }
+
+  // 组合关键字（allOf/anyOf/oneOf/not），对任意类型均可输出
+  for (const key of ['allOf', 'anyOf', 'oneOf'] as const) {
+    const arr = node[key];
+    const hasContainer = node._containers?.some((c) => c._nodeKind === key);
+    if (arr && arr.length > 0) {
+      schema[key] = arr.map((s) => generateJsonSchema(s));
+    } else if (hasContainer) {
+      schema[key] = [];
+    }
+  }
+
+  if (node.not) {
+    schema.not = generateJsonSchema(node.not);
+  } else if (node._containers?.some((c) => c._nodeKind === 'not')) {
+    schema.not = {};
   }
 
   if (node.definitions) {
@@ -265,7 +284,8 @@ export function generateJsonSchemaWithLineMap(
     if (schemaNode.patternProperties && jsonObj.patternProperties) {
       const sortedPatterns = Object.entries(schemaNode.patternProperties).sort((a, b) => (a[1]._order ?? 0) - (b[1]._order ?? 0));
       for (const [key, child] of sortedPatterns) {
-        const keyLine = lines.findIndex((l, i) => i >= currentLine && l.includes(`"${key}"`));
+        const escapedKey = key.replace(/\\/g, '\\\\');
+        const keyLine = lines.findIndex((l, i) => i >= currentLine && l.includes(`"${escapedKey}"`));
         if (keyLine >= 0) {
           lineMap.set(child.id, keyLine + 1);
           markNodeLines(child, jsonObj.patternProperties[key], keyLine);
@@ -329,7 +349,8 @@ export function generateJsonSchemaWithLineMap(
     if (schemaNode.dependentSchemas && jsonObj.dependentSchemas) {
       const sortedDependents = Object.entries(schemaNode.dependentSchemas).sort((a, b) => (a[1]._order ?? 0) - (b[1]._order ?? 0));
       for (const [key, child] of sortedDependents) {
-        const keyLine = lines.findIndex((l, i) => i >= currentLine && l.includes(`"${key}"`));
+        const escapedKey = key.replace(/\\/g, '\\\\');
+        const keyLine = lines.findIndex((l, i) => i >= currentLine && l.includes(`"${escapedKey}"`));
         if (keyLine >= 0) {
           lineMap.set(child.id, keyLine + 1);
           markNodeLines(child, jsonObj.dependentSchemas[key], keyLine);
